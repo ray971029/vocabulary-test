@@ -1,0 +1,2724 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>單字對決 Word Duel</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d0f14">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="單字對決">
+<style>
+  :root{
+    --bg:#0d0f14;
+    --panel:#161a22;
+    --panel-2:#1d222c;
+    --line:#2a3040;
+    --ink:#eef1f6;
+    --sub:#8892a4;
+    --p1:#3d7bff;
+    --p1-glow:rgba(61,123,255,.35);
+    --p2:#ff4d5e;
+    --p2-glow:rgba(255,77,94,.35);
+    --gold:#e0b84a;
+    --good:#31d17a;
+    --bad:#ff4d5e;
+    --warn:#f5a623;
+
+    /* 依「容器」實際寬度（cqw）流動縮放的字級／間距，而不是整個瀏覽器視窗寬度，
+       這樣即使外層面板（例如手機、對話側欄）比視窗窄，字級也會跟著容器本身的寬度縮放 */
+    --fs-brand: clamp(1.15rem, 5cqw, 2rem);
+    --fs-tagline: clamp(.74rem, 3cqw, .94rem);
+    --fs-body: clamp(.85rem, 3cqw, 1.05rem);
+    --fs-word: clamp(1.8rem, 11cqw, 3.6rem);
+    --fs-option: clamp(.85rem, 4cqw, 1.15rem);
+    --fs-code: clamp(2rem, 12cqw, 3.4rem);
+    --fs-end-title: clamp(1.4rem, 6.5cqw, 2.3rem);
+    --fs-level-chip: clamp(.82rem, 3.4cqw, 1.05rem);
+    --pad-card: clamp(14px, 3.6cqw, 30px);
+    --pad-app: clamp(10px, 3.2cqw, 24px);
+    --gap-option: clamp(8px, 1.6dvh, 14px);
+    --h-option: clamp(52px, 8.5dvh, 78px);
+    --app-max-w: min(94vw, 860px);
+  }
+  * { box-sizing:border-box; }
+  /* 用 min-height 而不是固定 height，內容超過一個螢幕時頁面才能正常往下捲；
+     原本寫死 height:100% 會讓超出的內容被卡住、捲不到下面的按鈕。
+     dvh 會跟著手機瀏覽器網址列的伸縮調整，比 vh 更準確（不支援的舊瀏覽器自動用上面那行 vh 值）。 */
+  html{ min-height:100%; }
+  body{
+    margin:0;
+    min-height:100vh;
+    min-height:100dvh;
+    background:
+      radial-gradient(1100px 600px at 20% -10%, #1a2035 0%, transparent 60%),
+      radial-gradient(1100px 600px at 100% 110%, #241419 0%, transparent 60%),
+      var(--bg);
+    background-attachment:fixed;
+    color:var(--ink);
+    font-family:"PingFang TC","Microsoft JhengHei","Noto Sans TC",-apple-system,BlinkMacSystemFont,sans-serif;
+    display:flex;
+    justify-content:center;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .app{
+    width:100%; max-width:var(--app-max-w); padding:var(--pad-app);
+    display:flex; flex-direction:column;
+    min-height:100vh;
+    min-height:100dvh;
+    padding-bottom:calc(var(--pad-app) + env(safe-area-inset-bottom, 0px));
+    container-type:inline-size; container-name:appbox;
+  }
+  /* 若瀏覽器不支援 CSS Container Query（極少數舊版），退回用視窗寬度 vw 計算，仍保有流動縮放效果 */
+  @supports not (container-type: inline-size){
+    :root{
+      --fs-brand: clamp(1.15rem, 3.6vw, 2rem);
+      --fs-tagline: clamp(.74rem, 2.2vw, .94rem);
+      --fs-body: clamp(.85rem, 2.2vw, 1.05rem);
+      --fs-word: clamp(1.8rem, 7.4vw, 3.6rem);
+      --fs-option: clamp(.85rem, 2.8vw, 1.15rem);
+      --fs-code: clamp(2rem, 8vw, 3.4rem);
+      --fs-end-title: clamp(1.4rem, 4.4vw, 2.3rem);
+      --fs-level-chip: clamp(.82rem, 2.4vw, 1.05rem);
+      --pad-card: clamp(14px, 2.4vw, 30px);
+      --pad-app: clamp(10px, 2.2vw, 24px);
+    }
+  }
+
+  /* ---------- 共用 ---------- */
+  .hidden{ display:none !important; }
+  h1.brand{
+    font-size:var(--fs-brand); font-weight:800; letter-spacing:.02em; margin:4px 0 2px;
+    display:flex; align-items:center; gap:10px;
+  }
+  h1.brand .sword{ filter:drop-shadow(0 0 6px var(--gold)); }
+  .tagline{ color:var(--sub); font-size:var(--fs-tagline); margin-bottom:clamp(14px,3dvh,22px); }
+
+  .card{
+    background:linear-gradient(180deg, var(--panel), var(--panel-2));
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:var(--pad-card);
+    box-shadow:0 20px 40px rgba(0,0,0,.35);
+  }
+
+  .btn{
+    display:block; width:100%; text-align:center; padding:clamp(12px,2.6dvh,17px) 16px;
+    border-radius:14px; border:1px solid var(--line); background:var(--panel-2);
+    color:var(--ink); font-size:var(--fs-body); font-weight:700; cursor:pointer;
+    transition:transform .12s ease, border-color .2s ease, background .2s ease;
+  }
+  .btn:active{ transform:scale(.98); }
+  .btn:disabled{ opacity:.4; cursor:default; }
+  .btn.primary{ background:linear-gradient(135deg,var(--p1),#274fbf); border-color:transparent; }
+  .btn.danger{ background:linear-gradient(135deg,var(--p2),#b8202f); border-color:transparent; }
+  .btn.gold{ background:linear-gradient(135deg,var(--gold),#a9812a); border-color:transparent; color:#1a1408; }
+  .btn.challenge{ background:linear-gradient(135deg,#ff8a3d,#c1121f); border-color:transparent; }
+  .btn.tournament{ background:linear-gradient(135deg,#7b2ff7,#c026d3); border-color:transparent; color:#fff; }
+
+  .tour-participant-row{ padding:10px 12px; border-radius:10px; background:var(--panel-2); border:1px solid var(--line); margin-bottom:8px; font-weight:600; }
+  .tour-round-block{ margin-bottom:16px; }
+  .tour-round-title{ font-weight:800; color:var(--gold); margin-bottom:8px; font-size:var(--fs-tagline); }
+  .tour-match-row{ padding:9px 12px; border-radius:10px; background:var(--panel-2); border:1px solid var(--line); margin-bottom:6px; font-size:.86rem; color:var(--sub); }
+  .tour-match-row.done{ color:var(--ink); border-color:var(--good); }
+  .tour-status-box{ text-align:center; padding:14px; border-radius:12px; background:var(--panel-2); border:1px solid var(--line); margin-bottom:16px; font-weight:700; }
+  .podium-row{ display:flex; align-items:center; gap:12px; padding:14px; border-radius:12px; background:var(--panel-2); border:1px solid var(--line); margin-bottom:10px; }
+  .podium-medal{ font-size:1.8rem; }
+  .podium-name{ font-weight:800; font-size:1.05rem; }
+  .btn.ghost{ background:transparent; }
+  .btn.small{ padding:10px 12px; font-size:.88rem; border-radius:10px; }
+  .row-gap{ display:flex; flex-direction:column; gap:12px; }
+  .row-2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  .field-label{ font-size:var(--fs-tagline); color:var(--sub); margin:14px 0 8px; font-weight:600; }
+  .code-input{
+    width:100%; padding:clamp(12px,3dvh,18px); font-size:clamp(1.2rem,6cqw,1.7rem); letter-spacing:.3em; text-align:center;
+    text-transform:uppercase; border-radius:12px; border:1px solid var(--line);
+    background:var(--panel); color:var(--ink); font-weight:800;
+  }
+  .code-input:focus{ outline:none; border-color:var(--p1); }
+
+  .level-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .level-chip{
+    border:2px solid var(--line); border-radius:12px; padding:clamp(9px,2.2dvh,14px) 6px; text-align:center;
+    cursor:pointer; background:var(--panel); font-weight:700; color:var(--sub); font-size:var(--fs-level-chip);
+    transition:all .15s ease;
+  }
+  .level-chip small{ display:block; font-weight:500; font-size:clamp(.62rem,2.2cqw,.75rem); margin-top:2px; }
+  .level-chip.on{ color:#fff; border-color:var(--chip); background:var(--chip-bg); box-shadow:0 0 0 3px var(--chip-glow); }
+
+  .hint{ color:var(--sub); font-size:var(--fs-tagline); line-height:1.6; margin-top:10px; }
+  .back-link{ color:var(--sub); font-size:.85rem; background:none; border:none; cursor:pointer; padding:6px 0 16px; text-align:left; }
+
+  /* ---------- 房間等待畫面 ---------- */
+  .room-code-display{
+    font-size:var(--fs-code); font-weight:900; letter-spacing:.3em; text-align:center;
+    color:var(--gold); margin:18px 0 6px; text-shadow:0 0 20px rgba(224,184,74,.4);
+  }
+  .pulse-dot{ width:8px; height:8px; border-radius:50%; background:var(--good); display:inline-block; margin-right:6px; animation:pulse 1.2s infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.3;} }
+
+  /* ---------- 對戰畫面 ---------- */
+  .arena-header{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .fighter{ flex:1; }
+  .fighter-name{ font-size:clamp(.7rem,2.6cqw,.85rem); font-weight:700; display:flex; justify-content:space-between; margin-bottom:5px; }
+  .fighter-name .tag{ color:var(--sub); font-weight:500; }
+  .hp-track{ height:clamp(16px,2.6dvh,20px); border-radius:8px; background:#000; border:1px solid var(--line); overflow:hidden; position:relative; }
+  .hp-num{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-size:clamp(.6rem,2.2cqw,.72rem); font-weight:800; color:#fff; letter-spacing:.02em;
+    text-shadow:0 1px 3px rgba(0,0,0,.9), 0 0 2px rgba(0,0,0,.7); pointer-events:none;
+  }
+  .hp-fill{ height:100%; border-radius:8px; transition:width .45s cubic-bezier(.2,.8,.2,1); }
+  .hp-fill.p1{ background:linear-gradient(90deg,var(--p1),#79a4ff); }
+  .hp-fill.p2{ background:linear-gradient(90deg,#79a4ff,var(--p2)); }
+  .fighter.right .fighter-name{ flex-direction:row-reverse; }
+  .fighter.right .hp-fill{ float:right; }
+  .vs-badge{
+    width:clamp(32px,7cqw,44px); height:clamp(32px,7cqw,44px); border-radius:50%; background:var(--panel-2); border:2px solid var(--gold);
+    display:flex; align-items:center; justify-content:center; font-weight:900; font-size:.7rem; color:var(--gold);
+    flex-shrink:0;
+  }
+
+  .round-timer-track{ height:5px; background:var(--panel-2); border-radius:3px; overflow:hidden; margin-bottom:16px; }
+  .round-timer-fill{ height:100%; background:var(--warn); width:100%; transition:width .1s linear; }
+
+  .word-stage{
+    text-align:center; padding:clamp(14px,3.4dvh,28px) 10px clamp(12px,2.6dvh,22px); position:relative;
+  }
+  .word-stage .level-tag{
+    display:inline-block; font-size:clamp(.65rem,2.4cqw,.78rem); font-weight:800; padding:3px 10px; border-radius:20px;
+    background:var(--chip-bg); color:#fff; margin-bottom:10px; letter-spacing:.05em;
+  }
+  #word-display, #practice-word-display{ font-size:var(--fs-word); font-weight:900; word-break:break-word; line-height:1.2; }
+  .buzz-status{ min-height:clamp(20px,3.4dvh,28px); font-weight:800; margin-top:8px; font-size:clamp(.8rem,3cqw,1rem); }
+  .buzz-status.p1{ color:var(--p1); }
+  .buzz-status.p2{ color:var(--p2); }
+  .buzz-status.warn{ color:var(--warn); }
+
+  .options-grid{ display:flex; flex-direction:column; gap:var(--gap-option); margin:8px 0 18px; }
+  .option-btn{
+    background:var(--panel); border:2px solid var(--line); padding:clamp(11px,2.4dvh,16px) 14px; border-radius:12px;
+    font-size:var(--fs-option); color:var(--ink); text-align:left; cursor:pointer; font-weight:600;
+    transition:all .15s ease;
+  }
+  .option-btn:disabled{ cursor:default; }
+  .option-btn.correct{ background:rgba(49,209,122,.18); border-color:var(--good); color:var(--good); }
+  .option-btn.wrong{ background:rgba(255,77,94,.18); border-color:var(--bad); color:var(--bad); }
+  .option-btn.dim{ opacity:.4; }
+
+  /* 本機雙人對戰：選項對半分區搶答（左=玩家A／右=玩家B），中文意思置中顯示 */
+  .option-btn.split{
+    position:relative; padding:0; display:flex; align-items:stretch; overflow:hidden; min-height:var(--h-option);
+  }
+  .option-btn.split .zone{
+    flex:1; border:none; background:rgba(255,255,255,.02); cursor:pointer; padding:0;
+    display:flex; align-items:flex-start; justify-content:flex-start; transition:background .12s ease;
+    touch-action:manipulation; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent;
+  }
+  .option-btn.split .zone.a{ background:rgba(61,123,255,.22); justify-content:flex-start; }
+  .option-btn.split .zone.b{ background:rgba(255,77,94,.20); justify-content:flex-end; }
+  .option-btn.split .zone.a:active:not(:disabled){ background:rgba(61,123,255,.45); }
+  .option-btn.split .zone.b:active:not(:disabled){ background:rgba(255,77,94,.42); }
+  .option-btn.split .zone:disabled{ cursor:default; }
+  .option-btn.split .zone-tag{
+    font-size:.65rem; font-weight:800; opacity:.55; padding:6px 9px; color:var(--ink);
+  }
+  .option-btn.split .divider{ width:2px; background:var(--line); flex-shrink:0; }
+  .option-btn.split .option-label{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    text-align:center; padding:0 clamp(28px,8cqw,48px); font-size:var(--fs-option); font-weight:700; color:var(--ink);
+    pointer-events:none; line-height:1.3;
+  }
+  .option-btn.split.correct{ border-color:var(--good); }
+  .option-btn.split.correct .option-label{ color:var(--good); }
+  .option-btn.split.wrong{ border-color:var(--bad); }
+  .option-btn.split.wrong .option-label{ color:var(--bad); }
+
+  .combo-badge{
+    position:absolute; top:2px; right:8px; font-size:.75rem; font-weight:800; color:var(--gold);
+  }
+
+  /* ---------- 結算畫面 ---------- */
+  .end-title{ font-size:var(--fs-end-title); font-weight:900; text-align:center; margin:10px 0 4px; }
+  .end-sub{ text-align:center; color:var(--sub); margin-bottom:18px; font-size:var(--fs-body); }
+  .end-stats{ display:flex; justify-content:space-around; margin:18px 0; }
+  .end-stat b{ display:block; font-size:clamp(1.3rem,5.6cqw,1.9rem); }
+  .end-stat span{ color:var(--sub); font-size:var(--fs-tagline); }
+
+  /* 正確率橫條動畫（個人練習結算） */
+  .accuracy-track{
+    height:24px; border-radius:12px; background:#000; border:1px solid var(--line);
+    overflow:hidden; position:relative; margin:16px 0 8px;
+  }
+  .accuracy-fill{
+    height:100%; width:0%; border-radius:12px;
+    background:linear-gradient(90deg, var(--bad), var(--warn), var(--good));
+    transition:width 1.3s cubic-bezier(.16,1,.3,1);
+  }
+  .accuracy-label{ text-align:center; font-weight:800; font-size:1.15rem; }
+  .accuracy-label b{ color:var(--gold); font-size:1.3rem; }
+
+  /* 勝利揭曉動畫 / 延長賽提示（共用同一套動畫樣式） */
+  .reveal-screen{
+    position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    flex:1; text-align:center; overflow:hidden; min-height:60dvh;
+  }
+  .reveal-glow{
+    position:absolute; inset:-20%; border-radius:50%;
+    background:radial-gradient(circle, var(--glow-color, var(--gold)) 0%, transparent 70%);
+    opacity:.35; animation:revealGlowPulse 1.6s ease-in-out infinite; filter:blur(10px);
+  }
+  .reveal-icon{
+    font-size:5.5rem; position:relative; animation:trophyPop .6s cubic-bezier(.34,1.56,.64,1) both;
+  }
+  .reveal-title{
+    font-size:clamp(1.4rem,7cqw,2.2rem); font-weight:900; margin-top:16px; position:relative;
+    animation:revealTitleIn .5s ease-out .25s both;
+  }
+  .reveal-sub{
+    margin-top:8px; position:relative; animation:revealTitleIn .5s ease-out .45s both;
+    color:var(--sub); font-size:var(--fs-body); padding:0 20px;
+  }
+  @keyframes trophyPop{
+    0%{ transform:scale(0) rotate(-15deg); opacity:0; }
+    60%{ transform:scale(1.15) rotate(5deg); opacity:1; }
+    100%{ transform:scale(1) rotate(0deg); opacity:1; }
+  }
+  @keyframes revealTitleIn{
+    0%{ transform:translateY(20px); opacity:0; }
+    100%{ transform:translateY(0); opacity:1; }
+  }
+  @keyframes revealGlowPulse{
+    0%,100%{ transform:scale(.9); opacity:.25; }
+    50%{ transform:scale(1.15); opacity:.5; }
+  }
+
+  /* 對戰開始倒數 3-2-1 */
+  .countdown-num{
+    font-size:clamp(4rem, 22cqw, 7rem); font-weight:900; color:#fff; position:relative;
+    text-shadow:0 4px 18px rgba(0,0,0,.5);
+  }
+  .countdown-num.pop{ animation:countdownPop .7s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes countdownPop{
+    0%{ transform:scale(.3); opacity:0; }
+    50%{ transform:scale(1.15); opacity:1; }
+    100%{ transform:scale(1); opacity:1; }
+  }
+
+  .footer-note{ margin-top:auto; padding-top:18px; color:var(--sub); font-size:clamp(.62rem,2cqw,.72rem); text-align:center; }
+
+  /* 內容較多時（例如選了很多等級、或選項數量多）不要把畫面撐爆導致按鈕按不到，
+     flex 子元素預設不會縮到比內容小，加上 min-height:0 才能正確讓出空間並捲動。 */
+  .app > div[id^="screen-"]{ min-height:0; }
+  .options-grid{ min-height:0; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ 選單畫面 ============ -->
+  <div id="screen-menu">
+    <h1 class="brand"><span class="sword">⚔️</span> 單字對決</h1>
+    <div class="tagline">Word Duel — 依 7000 單字六級分級，搶答制對戰</div>
+    <button class="back-link" id="btn-edit-name" style="text-align:left; padding:0 0 16px;">✏️ 暱稱：<span id="current-name-label">（尚未設定）</span>（點此更改）</button>
+
+    <div class="card row-gap">
+      <button class="btn primary" id="btn-mode-local">🏠 本機雙人對戰<br><small style="font-weight:500;opacity:.8">同一台裝置，選項分兩半 A/B 搶按</small></button>
+      <button class="btn danger" id="btn-mode-online">🌐 連線對戰<br><small style="font-weight:500;opacity:.8">兩台裝置，用房間代碼配對</small></button>
+      <button class="btn tournament" id="btn-mode-tournament">🏆 團體戰<br><small style="font-weight:500;opacity:.85">多人連線，單敗淘汰賽，選出前三名</small></button>
+      <button class="btn gold" id="btn-mode-practice">📖 個人練習<br><small style="font-weight:500;opacity:.8">自己一個人答題，不計較輸贏，慢慢背</small></button>
+      <button class="btn challenge" id="btn-mode-challenge">🔥 挑戰模式<br><small style="font-weight:500;opacity:.85">連續答對，難度會越來越高，看你能撐幾題（最高紀錄：<span id="menu-challenge-high">0</span>）</small></button>
+    </div>
+    <div class="hint">💡 搶答制：雙方看到同一題，先搶到的人可以作答；答對就對對手造成傷害，等級越高傷害越大，先把對手 HP 歸零（或單字用完時 HP 較高）獲勝。個人練習模式沒有對手、不計時，答完會顯示正確率。挑戰模式答錯就結束，連續答對題數會存在裝置上，下次開啟會記得最高紀錄。</div>
+  </div>
+
+  <!-- ============ 暱稱設定畫面 ============ -->
+  <div id="screen-name-setup" class="hidden">
+    <button class="back-link hidden" id="name-setup-back" data-back="screen-menu">← 返回</button>
+    <h1 class="brand"><span class="sword">⚔️</span> 單字對決</h1>
+    <div class="tagline" id="name-setup-tagline">先幫自己取個名字，連線對戰時對手會看到這個名字</div>
+    <div class="card row-gap">
+      <input type="text" id="name-setup-input" class="code-input" style="text-transform:none; letter-spacing:normal; font-size:1.15rem;" placeholder="輸入你的暱稱" maxlength="12" autocomplete="off" autocorrect="off" spellcheck="false" name="wd-nickname" data-lpignore="true" data-1p-ignore="true">
+      <button class="btn gold" id="btn-name-setup-confirm">儲存並繼續</button>
+    </div>
+  </div>
+
+  <!-- ============ 連線：建立或加入 ============ -->
+  <div id="screen-online-choice" class="hidden">
+    <button class="back-link" data-back="screen-menu">← 返回</button>
+    <h1 class="brand">🌐 連線對戰</h1>
+    <div class="card row-gap">
+      <button class="btn primary" id="btn-create-room">建立房間（我是房主）</button>
+      <button class="btn ghost" id="btn-join-room" style="border:1px solid var(--line)">輸入代碼加入房間</button>
+    </div>
+    <div id="join-code-box" class="card hidden" style="margin-top:14px;">
+      <div class="field-label">房間代碼</div>
+      <input class="code-input" id="join-code-input" maxlength="5" placeholder="AB12C" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" inputmode="text" name="wd-room-code" data-lpignore="true" data-1p-ignore="true">
+      <button class="btn primary" id="btn-join-confirm" style="margin-top:14px;">加入</button>
+      <div id="join-error" class="hint" style="color:var(--bad)"></div>
+    </div>
+  </div>
+
+  <!-- ============ 團體戰：建立或加入 ============ -->
+  <div id="screen-tournament-choice" class="hidden">
+    <button class="back-link" data-back="screen-menu">← 返回</button>
+    <h1 class="brand">🏆 團體戰</h1>
+    <div class="tagline">多人連線，單敗淘汰賽，決出前三名</div>
+    <div class="card row-gap">
+      <button class="btn tournament" id="btn-tour-create">建立賽事（我是主持人）</button>
+      <button class="btn ghost" id="btn-tour-join" style="border:1px solid var(--line)">輸入代碼加入賽事</button>
+    </div>
+    <div id="tour-join-code-box" class="card hidden" style="margin-top:14px;">
+      <div class="field-label">賽事代碼</div>
+      <input class="code-input" id="tour-join-code-input" maxlength="5" placeholder="AB12C" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" inputmode="text" name="wd-tour-code" data-lpignore="true" data-1p-ignore="true">
+      <button class="btn tournament" id="btn-tour-join-confirm" style="margin-top:14px;">加入</button>
+      <div id="tour-join-error" class="hint" style="color:var(--bad)"></div>
+    </div>
+  </div>
+
+  <!-- ============ 團體戰：大廳（等待玩家加入／開賽） ============ -->
+  <div id="screen-tournament-lobby" class="hidden">
+    <h1 class="brand">團體戰大廳</h1>
+    <div class="card" style="text-align:center;">
+      <div class="hint">把這組代碼分享給所有參賽者</div>
+      <div style="display:flex; align-items:center; justify-content:center; gap:10px; margin:14px 0 6px;">
+        <div class="room-code-display" id="tour-lobby-code" style="margin:0;">------</div>
+      </div>
+      <div class="hint" id="tour-lobby-hint">等待玩家加入…</div>
+    </div>
+    <div class="card" style="margin-top:14px;">
+      <div class="field-label">參賽者（<span id="tour-lobby-count">0</span> 人）</div>
+      <div id="tour-lobby-list"></div>
+    </div>
+    <button class="btn tournament hidden" id="btn-tour-start" style="margin-top:14px;" disabled>🚀 開始賽事</button>
+    <button class="btn ghost" style="border:1px solid var(--line); margin-top:10px;" id="btn-tour-lobby-cancel">離開大廳</button>
+  </div>
+
+  <!-- ============ 團體戰：賽程／觀戰畫面 ============ -->
+  <div id="screen-tournament-bracket" class="hidden">
+    <h1 class="brand">🏆 團體戰賽程</h1>
+    <div class="tour-status-box" id="tour-bracket-status">等待比賽開始…</div>
+    <div id="tour-bracket-list"></div>
+    <button class="btn ghost" style="border:1px solid var(--line); margin-top:10px;" id="btn-tour-bracket-leave">離開賽事</button>
+  </div>
+
+  <!-- ============ 團體戰：前三名頒獎 ============ -->
+  <div id="screen-tournament-end" class="hidden">
+    <div class="card">
+      <div class="end-title">🏆 團體戰結束！</div>
+      <div class="podium-row"><span class="podium-medal">🥇</span><span class="podium-name" id="tour-end-champion">-</span></div>
+      <div class="podium-row"><span class="podium-medal">🥈</span><span class="podium-name" id="tour-end-runner">-</span></div>
+      <div class="podium-row" id="tour-end-third-row"><span class="podium-medal">🥉</span><span class="podium-name" id="tour-end-third">-</span></div>
+      <button class="btn ghost" style="border:1px solid var(--line); margin-top:10px;" id="btn-tour-end-back-menu">回到主選單</button>
+    </div>
+  </div>
+
+  <!-- ============ 選擇單字等級 ============ -->
+  <div id="screen-levels" class="hidden">
+    <button class="back-link" id="levels-back">← 返回</button>
+    <h1 class="brand">選擇單字範圍</h1>
+    <div class="tagline">可複選多個等級混合出題</div>
+    <div class="card">
+      <div class="level-grid" id="level-grid"></div>
+      <div class="field-label">題數（每場對戰）</div>
+      <div class="row-2" id="round-count-group"></div>
+      <div class="hint" id="levels-hint">請至少選擇一個等級</div>
+      <button class="btn gold" id="btn-levels-continue" style="margin-top:18px;" disabled>下一步</button>
+    </div>
+  </div>
+
+  <!-- ============ 房主等待畫面 ============ -->
+  <div id="screen-waiting" class="hidden">
+    <h1 class="brand">等待對手加入…</h1>
+    <div class="card" style="text-align:center;">
+      <div class="hint">把這組代碼給你的對手輸入</div>
+      <div style="display:flex; align-items:center; justify-content:center; gap:10px; margin:18px 0 6px;">
+        <div class="room-code-display" id="waiting-code" style="margin:0;">------</div>
+        <button class="btn small" id="btn-copy-code" style="width:auto; padding:10px 14px; flex-shrink:0;" title="複製代碼">📋 複製</button>
+      </div>
+      <div class="hint"><span class="pulse-dot"></span>連線中，等待玩家二加入</div>
+      <button class="btn ghost ansi" style="border:1px solid var(--line); margin-top:16px;" id="btn-cancel-room">取消房間</button>
+    </div>
+  </div>
+
+  <!-- ============ 對戰畫面 ============ -->
+  <div id="screen-battle" class="hidden">
+    <div class="arena-header">
+      <div class="fighter left">
+        <div class="fighter-name"><span id="p1-name">玩家一</span><span class="tag" id="p1-score">0</span></div>
+        <div class="hp-track"><div class="hp-fill p1" id="p1-hp" style="width:100%"></div><span class="hp-num" id="p1-hp-num">100</span></div>
+      </div>
+      <div class="vs-badge">VS</div>
+      <div class="fighter right">
+        <div class="fighter-name"><span id="p2-name">玩家二</span><span class="tag" id="p2-score">0</span></div>
+        <div class="hp-track"><div class="hp-fill p2" id="p2-hp" style="width:100%"></div><span class="hp-num" id="p2-hp-num">100</span></div>
+      </div>
+    </div>
+
+    <div class="round-timer-track"><div class="round-timer-fill" id="round-timer-fill"></div></div>
+
+    <div class="word-stage">
+      <span class="level-tag" id="word-level-tag">Lv.1</span>
+      <div id="word-display">Loading...</div>
+      <div class="buzz-status" id="buzz-status"></div>
+    </div>
+
+    <div class="options-grid" id="options-container"></div>
+  </div>
+
+  <!-- ============ 個人練習畫面 ============ -->
+  <div id="screen-practice" class="hidden">
+    <button class="back-link" data-back="screen-menu" style="padding-bottom:6px;">← 返回</button>
+    <div class="arena-header" style="justify-content:space-between;">
+      <div style="font-weight:700; font-size:var(--fs-body); color:var(--sub);">第 <span id="practice-progress-cur">1</span> / <span id="practice-progress-total">12</span> 題</div>
+      <div style="font-weight:700; font-size:var(--fs-body); color:var(--good);">答對 <span id="practice-correct-count">0</span> 題</div>
+    </div>
+
+    <div class="word-stage">
+      <span class="level-tag" id="practice-level-tag">Lv.1</span>
+      <div id="practice-word-display">Loading...</div>
+      <div class="buzz-status" id="practice-status"></div>
+    </div>
+
+    <div class="options-grid" id="practice-options-container"></div>
+  </div>
+
+  <!-- ============ 個人練習結算畫面 ============ -->
+  <div id="screen-practice-end" class="hidden">
+    <div class="card">
+      <div class="end-title">🎉 練習完成！</div>
+      <div class="end-sub" id="practice-end-sub">答對 0 / 0 題</div>
+      <div class="accuracy-track"><div class="accuracy-fill" id="practice-accuracy-fill"></div></div>
+      <div class="accuracy-label"><b id="practice-end-accuracy">0%</b> 正確率</div>
+      <button class="btn gold" id="btn-practice-again" style="margin-top:14px;">再練習一次</button>
+      <button class="btn ghost" id="btn-practice-back-menu" style="border:1px solid var(--line); margin-top:10px;">回到主選單</button>
+    </div>
+  </div>
+
+  <!-- ============ 挑戰模式畫面 ============ -->
+  <div id="screen-challenge" class="hidden">
+    <button class="back-link" id="challenge-back-btn" data-back="screen-menu" style="padding-bottom:6px;">← 返回</button>
+    <div class="arena-header" style="justify-content:center;">
+      <div style="font-weight:900; font-size:clamp(1.05rem,5cqw,1.4rem); color:var(--gold);">🔥 連續答對 <span id="challenge-streak">0</span> 題</div>
+    </div>
+
+    <div class="round-timer-track"><div class="round-timer-fill" id="challenge-timer-fill"></div></div>
+
+    <div class="word-stage">
+      <span class="level-tag" id="challenge-level-tag">Lv.1</span>
+      <div id="challenge-word-display">Loading...</div>
+      <div class="buzz-status" id="challenge-status"></div>
+    </div>
+
+    <div class="options-grid" id="challenge-options-container"></div>
+  </div>
+
+  <!-- ============ 挑戰模式結算畫面 ============ -->
+  <div id="screen-challenge-end" class="hidden">
+    <div class="card">
+      <div class="end-title" id="challenge-end-title">💥 挑戰結束！</div>
+      <div class="end-sub" id="challenge-end-sub">連續答對 0 題</div>
+      <div class="end-stats">
+        <div class="end-stat"><b id="challenge-end-high">0</b><span>歷史最高紀錄</span></div>
+      </div>
+      <button class="btn challenge" id="btn-challenge-again" style="margin-top:14px;">再挑戰一次</button>
+      <button class="btn ghost" id="btn-challenge-back-menu" style="border:1px solid var(--line); margin-top:10px;">回到主選單</button>
+    </div>
+  </div>
+
+  <!-- ============ 對戰開始倒數 ============ -->
+  <div id="screen-countdown" class="hidden reveal-screen">
+    <div class="reveal-glow" style="--glow-color:var(--gold);"></div>
+    <div class="countdown-num" id="countdown-num">3</div>
+  </div>
+
+  <!-- ============ 勝利揭曉動畫 ============ -->
+  <div id="screen-reveal" class="hidden reveal-screen">
+    <div class="reveal-glow" id="reveal-glow"></div>
+    <div class="reveal-icon" id="reveal-icon">🏆</div>
+    <div class="reveal-title" id="reveal-title">獲勝！</div>
+    <div class="reveal-sub">正在結算戰績…</div>
+  </div>
+
+  <!-- ============ 延長賽提示動畫 ============ -->
+  <div id="screen-overtime" class="hidden reveal-screen">
+    <div class="reveal-glow" style="--glow-color:var(--warn);"></div>
+    <div class="reveal-icon">⚔️</div>
+    <div class="reveal-title">延長賽！</div>
+    <div class="reveal-sub">雙方都還沒被擊倒，題目補充中，繼續戰鬥到分出勝負！</div>
+  </div>
+
+  <!-- ============ 結算畫面 ============ -->
+  <div id="screen-end" class="hidden">
+    <div class="card">
+      <div class="end-title" id="end-title">🏆 玩家一獲勝！</div>
+      <div class="end-sub" id="end-sub">對戰結束</div>
+      <div class="end-stats">
+        <div class="end-stat"><b id="end-p1-score">0</b><span id="end-p1-label">玩家一得分</span></div>
+        <div class="end-stat"><b id="end-p2-score">0</b><span id="end-p2-label">玩家二得分</span></div>
+      </div>
+      <button class="btn gold" id="btn-play-again">再來一場</button>
+      <button class="btn ghost" id="btn-back-menu" style="border:1px solid var(--line); margin-top:10px;">回到主選單</button>
+    </div>
+  </div>
+
+  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-27-01（如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
+</div>
+
+<!-- PeerJS：連線對戰用的 WebRTC 點對點直連函式庫 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
+<!-- 單字資料庫獨立成 vocab-data.js，減少這個檔案本身的大小 -->
+<script src="vocab-data.js"></script>
+<script>
+
+// ==========================================
+// 常數與工具
+// ==========================================
+const LEVEL_META = {
+  1:{name:'基礎', color:'#27ae60'},
+  2:{name:'初級', color:'#8e44ad'},
+  3:{name:'中級', color:'#d35400'},
+  4:{name:'中高', color:'#c0392b'},
+  5:{name:'高級', color:'#4a63e8'},
+  6:{name:'終極', color:'#b8962e'},
+};
+const BUZZ_WINDOW = 8000;
+const ANSWER_WINDOW = 5000;
+const RESOLVE_DELAY = 1500;
+const BACKLASH_DMG = 8;
+const MIN_HP = 60;
+const MAX_HP = 260;
+const HP_ROUND_FACTOR = 0.55; // HP 隨題數與等級傷害動態調整的係數
+
+function getDataForLevel(n){
+  switch(n){
+    case 1: return dataLevel1;
+    case 2: return dataLevel2;
+    case 3: return dataLevel3;
+    case 4: return dataLevel4;
+    case 5: return dataLevel5;
+    case 6: return dataLevel6;
+    default: return [];
+  }
+}
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
+function dmgForLevel(l){ return 6 + l*3; }
+
+function determineWinner(hp, score){
+  if(hp.p1 <= 0 && hp.p2 <= 0) return 'draw';
+  if(hp.p1 <= 0) return 'p2';
+  if(hp.p2 <= 0) return 'p1';
+  if(hp.p1 !== hp.p2) return hp.p1 > hp.p2 ? 'p1' : 'p2';
+  if(score.p1 !== score.p2) return score.p1 > score.p2 ? 'p1' : 'p2';
+  return 'draw';
+}
+
+// HP 數字用「跳動」動畫從目前顯示的數字滾到新數字，而不是瞬間換掉，
+// 扣血/回合開始時看起來更有動態感。目前值跟目標值一樣就直接跳過，不做無意義的動畫。
+const hpNumAnimFrames = {};
+function animateHpNumber(elId, toValue){
+  const el = document.getElementById(elId);
+  const fromValue = parseInt(el.textContent, 10);
+  if(isNaN(fromValue) || fromValue === toValue){ el.textContent = toValue; return; }
+  if(hpNumAnimFrames[elId]) cancelAnimationFrame(hpNumAnimFrames[elId]);
+  const duration = 550;
+  const start = performance.now();
+  function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
+  function tick(now){
+    const t = Math.min(1, (now - start) / duration);
+    const eased = easeOutCubic(t);
+    el.textContent = Math.round(fromValue + (toValue - fromValue) * eased);
+    if(t < 1){
+      hpNumAnimFrames[elId] = requestAnimationFrame(tick);
+    } else {
+      el.textContent = toValue;
+      delete hpNumAnimFrames[elId];
+    }
+  }
+  hpNumAnimFrames[elId] = requestAnimationFrame(tick);
+}
+
+// 對戰開始前的 3-2-1 倒數動畫，每個數字都停留一小段時間、故意不要跑太快，增加開賽的儀式感。
+function showCountdown(onDone){
+  const el = document.getElementById('countdown-num');
+  showScreen('screen-countdown');
+  const sequence = ['3', '2', '1', '開始！'];
+  let i = 0;
+  function step(){
+    el.textContent = sequence[i];
+    el.classList.remove('pop');
+    void el.offsetWidth; // 強制觸發 reflow，讓同一個元素能重新播放同一段 CSS 動畫
+    el.classList.add('pop');
+    i++;
+    if(i < sequence.length){
+      setTimeout(step, 800);
+    } else {
+      setTimeout(onDone, 700);
+    }
+  }
+  step();
+}
+
+// 依實際牌組（題數 × 該牌組平均傷害）動態計算雙方初始 HP，
+// 避免題數選很多、或選的等級偏高（單次傷害大）時，戰鬥還沒打到一半就分出勝負、
+// 剩下大半題目都用不到。
+function computeStartHP(deck){
+  if(!deck || !deck.length) return 100;
+  const totalDmg = deck.reduce((sum, item)=> sum + dmgForLevel(item.l), 0);
+  const avgDmg = totalDmg / deck.length;
+  let hp = avgDmg * deck.length * HP_ROUND_FACTOR;
+  hp = Math.round(hp / 10) * 10;
+  return Math.max(MIN_HP, Math.min(MAX_HP, hp));
+}
+function showScreen(id){
+  document.querySelectorAll('.app > div[id^="screen-"]').forEach(el=>el.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+// ==========================================
+// 玩家暱稱：第一次開啟時詢問，之後存在裝置本機（localStorage），連線對戰時會顯示這個名字。
+// 提醒：localStorage 在 Claude 預覽這種沙盒 iframe 環境可能無法持久化（會被瀏覽器擋掉寫入），
+// 這種情況下名字只能記得「這次使用期間」，重新整理就會忘記；但真的架站成獨立網頁/PWA 使用時，
+// 存取都是正常的，暱稱會一直記住。這裡用 try/catch 包起來，就算存取失敗也不會讓遊戲整個壞掉。
+// ==========================================
+const NAME_STORAGE_KEY = 'wordDuelPlayerName';
+let playerName = '';
+let hostDisplayName = '';
+let guestDisplayName = '';
+
+function loadPlayerName(){
+  try{ return (localStorage.getItem(NAME_STORAGE_KEY) || '').trim(); }catch(e){ return ''; }
+}
+function savePlayerName(name){
+  try{ localStorage.setItem(NAME_STORAGE_KEY, name); }catch(e){ /* 沙盒環境擋掉寫入，忽略即可，不影響遊戲本身 */ }
+}
+function updateNameLabel(){
+  const el = document.getElementById('current-name-label');
+  if(el) el.textContent = playerName || '（尚未設定）';
+}
+function openNameSetup(isFirstRun){
+  document.getElementById('name-setup-back').classList.toggle('hidden', !!isFirstRun);
+  document.getElementById('name-setup-tagline').textContent = isFirstRun
+    ? '先幫自己取個名字，連線對戰時對手會看到這個名字'
+    : '更改你的暱稱';
+  const input = document.getElementById('name-setup-input');
+  input.value = isFirstRun ? '' : playerName;
+  showScreen('screen-name-setup');
+  input.focus();
+}
+document.getElementById('btn-edit-name').onclick = ()=> openNameSetup(false);
+document.getElementById('btn-name-setup-confirm').onclick = ()=>{
+  const input = document.getElementById('name-setup-input');
+  const val = input.value.trim().slice(0, 12);
+  if(!val){ input.placeholder = '請輸入暱稱才能繼續'; input.focus(); return; }
+  playerName = val;
+  savePlayerName(playerName);
+  updateNameLabel();
+  showScreen('screen-menu');
+};
+document.getElementById('name-setup-input').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter') document.getElementById('btn-name-setup-confirm').onclick();
+});
+
+// 開機檢查：沒有存過名字的話，先要求輸入才能進主選單
+playerName = loadPlayerName();
+updateNameLabel();
+if(!playerName){ openNameSetup(true); }
+
+// 挑戰模式最高紀錄：跟暱稱一樣存在裝置本機（localStorage），同樣的沙盒限制也一併適用。
+const CHALLENGE_HIGH_KEY = 'wordDuelChallengeHigh';
+let challengeHigh = 0;
+function loadChallengeHigh(){
+  try{ const v = parseInt(localStorage.getItem(CHALLENGE_HIGH_KEY), 10); return isNaN(v) ? 0 : v; }catch(e){ return 0; }
+}
+function saveChallengeHigh(v){
+  try{ localStorage.setItem(CHALLENGE_HIGH_KEY, String(v)); }catch(e){ /* 沙盒環境擋掉寫入，忽略即可 */ }
+}
+function updateMenuChallengeHigh(){
+  const el = document.getElementById('menu-challenge-high');
+  if(el) el.textContent = challengeHigh;
+}
+challengeHigh = loadChallengeHigh();
+updateMenuChallengeHigh();
+
+// ==========================================
+// 封鎖右鍵選單與常見的開發者工具快捷鍵（F12、Ctrl+Shift+I/J/C、Ctrl+U）。
+// 提醒：這只能擋掉「隨手」想看原始碼的人，擋不住真的想拆解網頁的人
+// （瀏覽器選單一樣能開發者工具、也能直接讀取下載下來的檔案），純粹是降低隨手複製的方便度。
+// ==========================================
+document.addEventListener('contextmenu', (e)=> e.preventDefault());
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'F12'){ e.preventDefault(); return; }
+  if(e.ctrlKey && e.shiftKey && ['I','J','C','i','j','c'].includes(e.key)){ e.preventDefault(); return; }
+  if(e.ctrlKey && (e.key === 'u' || e.key === 'U')){ e.preventDefault(); return; }
+});
+
+// 房主一鍵複製房間代碼
+document.getElementById('btn-copy-code').onclick = async ()=>{
+  const btn = document.getElementById('btn-copy-code');
+  const code = ROOM_CODE_TEXT_FOR_COPY();
+  let copied = false;
+  try{
+    await navigator.clipboard.writeText(code);
+    copied = true;
+  }catch(e){
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = code;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      copied = document.execCommand('copy');
+      document.body.removeChild(ta);
+    }catch(e2){ copied = false; }
+  }
+  const original = btn.textContent;
+  btn.textContent = copied ? '✅ 已複製' : '❌ 複製失敗';
+  setTimeout(()=>{ btn.textContent = original; }, 1500);
+};
+function ROOM_CODE_TEXT_FOR_COPY(){
+  return (typeof ROOM_CODE !== 'undefined' && ROOM_CODE) ? ROOM_CODE : document.getElementById('waiting-code').textContent;
+}
+
+// 依「每個等級各自要出幾題」組成一副牌：levelCounts 例如 {1:8} 或 {1:5, 3:10}。
+// 每個等級各自從該等級的單字池抽出指定數量，再整體洗牌交錯；每題已預先算好選項，
+// 確保雙方（連線模式）看到一致內容。干擾選項則從「所有有牌的等級」混合抽取。
+function buildDeck(levelCounts){
+  const distractorPool = [];
+  let combined = [];
+
+  Object.keys(levelCounts).forEach(lvlStr=>{
+    const l = Number(lvlStr);
+    const words = getDataForLevel(l).map(([w,m])=> ({w,m,l}));
+    words.forEach(item=> distractorPool.push(item));
+
+    const count = levelCounts[lvlStr];
+    if(!count || count <= 0) return;
+    const pool = words.slice();
+    shuffle(pool);
+    combined = combined.concat(pool.slice(0, Math.min(count, pool.length)));
+  });
+
+  shuffle(combined);
+
+  const deck = combined.map(item=>{
+    let options = [item.m];
+    let guard = 0;
+    while(options.length < 5 && guard < 200){
+      guard++;
+      const rand = distractorPool[Math.floor(Math.random()*distractorPool.length)];
+      if(!options.includes(rand.m)) options.push(rand.m);
+    }
+    shuffle(options);
+    return { w:item.w, m:item.m, l:item.l, options };
+  });
+  return deck;
+}
+
+// ==========================================
+// 畫面：選單
+// ==========================================
+let pendingFlow = { mode:null }; // 'local' | 'online-host'
+let selectedLevels = new Set([1]);
+let singleRoundCount = 12;     // 只選 1 個等級時使用
+let customRoundActive = false; // 是否正在用「自訂題數」而不是預設按鈕
+let perLevelCounts = {};       // 選 2 個等級以上時，每個等級各自的題數 { level: count }
+let perLevelTouched = new Set(); // 玩家自己手動改過題數的等級，改選等級時不會覆蓋掉這些自訂值
+let lastLevelCounts = null;    // 記住上一場實際使用的等級/題數設定，供「再來一場」重複使用
+
+document.getElementById('btn-mode-local').onclick = ()=>{
+  pendingFlow = { mode:'local' };
+  openLevelsScreen();
+};
+document.getElementById('btn-mode-practice').onclick = ()=>{
+  pendingFlow = { mode:'practice' };
+  openLevelsScreen();
+};
+// 連線對戰改用 WebRTC 點對點直連（PeerJS），只要兩邊都有網路就能連，
+// 不再依賴 Claude App 內建的雲端同步，獨立安裝到手機的版本也能用。
+function onlineFeatureAvailable(){
+  return typeof Peer !== 'undefined';
+}
+
+document.getElementById('btn-mode-online').onclick = ()=>{
+  if(!onlineFeatureAvailable()){
+    alert('連線對戰的元件還沒載入完成，請確認網路連線正常後重新整理頁面再試一次。');
+    return;
+  }
+  document.getElementById('join-code-box').classList.add('hidden');
+  document.getElementById('join-error').textContent = '';
+  showScreen('screen-online-choice');
+};
+document.getElementById('btn-mode-tournament').onclick = ()=>{
+  if(!onlineFeatureAvailable()){
+    alert('團體戰的元件還沒載入完成，請確認網路連線正常後重新整理頁面再試一次。');
+    return;
+  }
+  document.getElementById('tour-join-code-box').classList.add('hidden');
+  document.getElementById('tour-join-error').textContent = '';
+  showScreen('screen-tournament-choice');
+};
+document.querySelectorAll('[data-back]').forEach(btn=>{
+  btn.onclick = ()=> showScreen(btn.getAttribute('data-back'));
+});
+document.getElementById('btn-create-room').onclick = ()=>{
+  pendingFlow = { mode:'online-host' };
+  openLevelsScreen();
+};
+document.getElementById('btn-join-room').onclick = ()=>{
+  document.getElementById('join-code-box').classList.remove('hidden');
+};
+
+document.getElementById('btn-tour-create').onclick = ()=>{
+  pendingFlow = { mode:'tournament-host' };
+  openLevelsScreen();
+};
+
+function openLevelsScreen(){
+  renderLevelGrid();
+  syncPerLevelCounts();
+  renderRoundCountArea();
+  document.getElementById('levels-back').onclick = ()=>{
+    showScreen(pendingFlow.mode === 'online-host' ? 'screen-online-choice'
+      : pendingFlow.mode === 'tournament-host' ? 'screen-tournament-choice' : 'screen-menu');
+  };
+  showScreen('screen-levels');
+}
+
+function renderLevelGrid(){
+  const grid = document.getElementById('level-grid');
+  grid.innerHTML = '';
+  for(let l=1;l<=6;l++){
+    const meta = LEVEL_META[l];
+    const chip = document.createElement('div');
+    chip.className = 'level-chip' + (selectedLevels.has(l) ? ' on' : '');
+    chip.innerHTML = `Lv.${l}<small>${meta.name}</small>`;
+    if(selectedLevels.has(l)){
+      chip.style.borderColor = meta.color;
+      chip.style.background = meta.color;
+      chip.style.boxShadow = '0 0 0 3px ' + meta.color + '55';
+    }
+    chip.onclick = ()=>{
+      if(selectedLevels.has(l)) selectedLevels.delete(l); else selectedLevels.add(l);
+      renderLevelGrid();
+      syncPerLevelCounts();
+      renderRoundCountArea();
+    };
+    grid.appendChild(chip);
+  }
+  updateContinueButtonState();
+}
+
+// 等級勾選改變時，同步 perLevelCounts：拿掉沒選的等級、幫新選的等級補一個預設題數
+function syncPerLevelCounts(){
+  Object.keys(perLevelCounts).forEach(k=>{
+    if(!selectedLevels.has(Number(k))){
+      delete perLevelCounts[k];
+      perLevelTouched.delete(Number(k));
+    }
+  });
+  const n = selectedLevels.size || 1;
+  const defaultEach = Math.max(2, Math.round(12 / n));
+  // 沒被玩家手動改過的等級，每次改選都重新均分成一樣的預設值，
+  // 不會因為「先選的」還留著舊的（等級數較少時算出的）預設值而變得比較多。
+  selectedLevels.forEach(l=>{
+    if(!perLevelTouched.has(l)) perLevelCounts[l] = defaultEach;
+  });
+}
+
+// 建立一個「− [輸入框] +」的數字輸入元件，省去玩家手動打字的時間
+function createStepperInput({ value, min, max, onChange }){
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex; align-items:stretch; gap:5px;';
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = String(min);
+  input.max = String(max);
+  input.value = value;
+  input.style.cssText = 'flex:1; min-width:0; padding:8px 4px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--ink); text-align:center; font-weight:700;';
+
+  function clamp(v){ return Math.max(min, Math.min(max, isNaN(v) ? min : v)); }
+  function commit(v){ v = clamp(v); input.value = v; onChange(v); }
+
+  const btnMinus = document.createElement('button');
+  btnMinus.type = 'button';
+  btnMinus.textContent = '−';
+  btnMinus.style.cssText = 'width:34px; flex-shrink:0; border-radius:8px; border:1px solid var(--line); background:var(--panel-2); color:var(--ink); font-weight:900; font-size:1.05rem; cursor:pointer;';
+  btnMinus.onclick = ()=> commit((parseInt(input.value,10)||min) - 1);
+
+  const btnPlus = document.createElement('button');
+  btnPlus.type = 'button';
+  btnPlus.textContent = '+';
+  btnPlus.style.cssText = btnMinus.style.cssText;
+  btnPlus.onclick = ()=> commit((parseInt(input.value,10)||min) + 1);
+
+  input.oninput = ()=>{
+    const v = parseInt(input.value, 10);
+    onChange(isNaN(v) ? min : v); // 打字過程先不強制夾住範圍，避免游標亂跳
+  };
+  input.onblur = ()=> commit(parseInt(input.value, 10));
+
+  wrap.appendChild(btnMinus);
+  wrap.appendChild(input);
+  wrap.appendChild(btnPlus);
+  return wrap;
+}
+
+// 只選 1 個等級：維持原本的預設按鈕，另外加一個「自訂題數」輸入框（含 +/− 快速調整）。
+// 選 2 個等級以上：每個等級各自一格輸入框（左右兩欄排版），可以分別指定要出幾題，並即時顯示加總。
+function renderRoundCountArea(){
+  const box = document.getElementById('round-count-group');
+  box.innerHTML = '';
+
+  if(selectedLevels.size <= 1){
+    box.style.display = 'grid';
+    box.style.gridTemplateColumns = '1fr 1fr';
+    box.style.gap = '8px';
+
+    [8, 12, 16, 24].forEach(n=>{
+      const b = document.createElement('button');
+      b.className = 'btn small' + (!customRoundActive && singleRoundCount === n ? ' primary' : '');
+      b.textContent = n + ' 題';
+      b.onclick = ()=>{ singleRoundCount = n; customRoundActive = false; renderRoundCountArea(); };
+      box.appendChild(b);
+    });
+
+    const customWrap = document.createElement('div');
+    customWrap.style.cssText = 'grid-column:1 / -1; display:flex; align-items:center; gap:8px; margin-top:6px;';
+    const label = document.createElement('span');
+    label.textContent = '自訂題數：';
+    label.style.cssText = 'font-size:.85rem; color:var(--sub); white-space:nowrap;';
+    const stepper = createStepperInput({
+      value: customRoundActive ? singleRoundCount : 12,
+      min: 4, max: 60,
+      onChange: (v)=>{ singleRoundCount = v; customRoundActive = true; updateContinueButtonState(); }
+    });
+    customWrap.appendChild(label);
+    customWrap.appendChild(stepper);
+    box.appendChild(customWrap);
+  } else {
+    box.style.display = 'grid';
+    box.style.gridTemplateColumns = '1fr 1fr';
+    box.style.gap = '10px';
+
+    Array.from(selectedLevels).sort((a,b)=> a - b).forEach(l=>{
+      const meta = LEVEL_META[l];
+      const cell = document.createElement('div');
+      cell.style.cssText = 'display:flex; flex-direction:column; gap:6px; padding:10px; border:1px solid var(--line); border-radius:10px; background:var(--panel);';
+      const tag = document.createElement('span');
+      tag.textContent = `Lv.${l} ${meta.name}`;
+      tag.style.cssText = `font-size:.78rem; font-weight:700; color:${meta.color};`;
+      const maxV = Math.min(60, getDataForLevel(l).length);
+      const stepper = createStepperInput({
+        value: perLevelCounts[l] != null ? perLevelCounts[l] : 0,
+        min: 0, max: maxV,
+        onChange: (v)=>{ perLevelCounts[l] = v; perLevelTouched.add(l); renderMultiTotalLabel(); }
+      });
+      cell.appendChild(tag);
+      cell.appendChild(stepper);
+      box.appendChild(cell);
+    });
+
+    const totalRow = document.createElement('div');
+    totalRow.id = 'multi-total-label';
+    totalRow.style.cssText = 'grid-column:1 / -1; text-align:right; font-size:.8rem; color:var(--sub); margin-top:2px;';
+    box.appendChild(totalRow);
+    renderMultiTotalLabel();
+  }
+
+  updateContinueButtonState();
+}
+
+function renderMultiTotalLabel(){
+  const total = Object.values(perLevelCounts).reduce((a,b)=> a + (b||0), 0);
+  const el = document.getElementById('multi-total-label');
+  if(el) el.textContent = `總題數：${total} 題`;
+  updateContinueButtonState();
+}
+
+function updateContinueButtonState(){
+  let ok;
+  if(selectedLevels.size === 0){
+    ok = false;
+  } else if(selectedLevels.size === 1){
+    ok = true;
+  } else {
+    const total = Object.values(perLevelCounts).reduce((a,b)=> a + (b||0), 0);
+    ok = total >= 1;
+  }
+  document.getElementById('btn-levels-continue').disabled = !ok;
+}
+
+document.getElementById('btn-levels-continue').onclick = ()=>{
+  const levels = Array.from(selectedLevels).sort((a,b)=> a - b);
+  const levelCounts = {};
+  if(levels.length <= 1){
+    levelCounts[levels[0]] = singleRoundCount;
+  } else {
+    levels.forEach(l=>{ levelCounts[l] = perLevelCounts[l] || 0; });
+  }
+  lastLevelCounts = levelCounts;
+  if(pendingFlow.mode === 'local'){
+    startLocalGame(levelCounts);
+  } else if(pendingFlow.mode === 'online-host'){
+    createOnlineRoom(levelCounts);
+  } else if(pendingFlow.mode === 'tournament-host'){
+    createTournamentRoom(levelCounts);
+  } else if(pendingFlow.mode === 'practice'){
+    startPracticeSession(levelCounts);
+  }
+};
+
+// ==========================================
+// 本機雙人對戰
+// ==========================================
+let LG = null; // local game state
+let localBuzzTimer=null, localAnswerTimer=null, localTimerStart=0, localTimerDur=0, localTimerRAF=null;
+const LOCAL_DECIDE_WINDOW = 9000;
+
+function startLocalGame(levelCounts){
+  const deck = buildDeck(levelCounts);
+  const hp0 = computeStartHP(deck);
+  LG = {
+    deck, idx:0, maxHp:hp0,
+    hp:{p1:hp0, p2:hp0},
+    score:{p1:0, p2:0},
+  };
+  document.getElementById('p1-name').textContent = '玩家一 (A)';
+  document.getElementById('p2-name').textContent = '玩家二 (B)';
+  document.getElementById('p1-hp-num').textContent = hp0;
+  document.getElementById('p2-hp-num').textContent = hp0;
+
+  showCountdown(()=>{
+    showScreen('screen-battle');
+    startLocalRound();
+  });
+}
+
+function localClearTimers(){
+  clearTimeout(localBuzzTimer); clearTimeout(localAnswerTimer);
+  if(localTimerRAF) cancelAnimationFrame(localTimerRAF);
+}
+
+function localRunTimerBar(durationMs, onExpire){
+  localTimerStart = performance.now();
+  localTimerDur = durationMs;
+  const fill = document.getElementById('round-timer-fill');
+  fill.style.background = 'var(--warn)';
+  function tick(){
+    const elapsed = performance.now() - localTimerStart;
+    const pct = Math.max(0, 100 - (elapsed/localTimerDur)*100);
+    fill.style.width = pct + '%';
+    if(elapsed >= localTimerDur){ onExpire(); return; }
+    localTimerRAF = requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+function localRenderHpScore(){
+  document.getElementById('p1-hp').style.width = Math.max(0, LG.hp.p1/LG.maxHp*100) + '%';
+  document.getElementById('p2-hp').style.width = Math.max(0, LG.hp.p2/LG.maxHp*100) + '%';
+  animateHpNumber('p1-hp-num', Math.max(0, LG.hp.p1));
+  animateHpNumber('p2-hp-num', Math.max(0, LG.hp.p2));
+  document.getElementById('p1-score').textContent = LG.score.p1;
+  document.getElementById('p2-score').textContent = LG.score.p2;
+}
+
+function startLocalRound(){
+  if(LG.hp.p1 <= 0 || LG.hp.p2 <= 0 || LG.idx >= LG.deck.length){
+    return endLocalGame();
+  }
+  localClearTimers();
+  LG.buzzedBy = null;
+  const item = LG.deck[LG.idx];
+  const tag = document.getElementById('word-level-tag');
+  tag.textContent = 'Lv.' + item.l + ' ' + LEVEL_META[item.l].name;
+  tag.style.background = LEVEL_META[item.l].color;
+  document.getElementById('word-display').textContent = item.w;
+  document.getElementById('buzz-status').textContent = '看誰先按到正確答案！';
+  document.getElementById('buzz-status').className = 'buzz-status';
+
+  const opt = document.getElementById('options-container');
+  opt.innerHTML = '';
+  item.options.forEach(text=>{
+    const row = document.createElement('div');
+    row.className = 'option-btn split';
+    row.dataset.text = text;
+
+    const zoneA = document.createElement('button');
+    zoneA.className = 'zone a';
+    zoneA.innerHTML = '<span class="zone-tag">A</span>';
+    // pointerdown 在手指一碰到螢幕就立刻觸發（不像 click 要等放開、還可能被瀏覽器
+    // 誤判成多指手勢而延遲），兩人同時搶按時能更準確抓到「誰真的先碰到」。
+    // click 保留作為鍵盤（Enter/Space）操作的備援，localOnPick 內建重複觸發防護，不會誤判。
+    zoneA.onpointerdown = ()=> localOnPick('p1', text, item.m);
+    zoneA.onclick = ()=> localOnPick('p1', text, item.m);
+
+    const divider = document.createElement('div');
+    divider.className = 'divider';
+
+    const zoneB = document.createElement('button');
+    zoneB.className = 'zone b';
+    zoneB.innerHTML = '<span class="zone-tag">B</span>';
+    zoneB.onpointerdown = ()=> localOnPick('p2', text, item.m);
+    zoneB.onclick = ()=> localOnPick('p2', text, item.m);
+
+    const label = document.createElement('span');
+    label.className = 'option-label';
+    label.textContent = text;
+
+    row.appendChild(zoneA);
+    row.appendChild(divider);
+    row.appendChild(zoneB);
+    row.appendChild(label);
+    opt.appendChild(row);
+  });
+
+  localRenderHpScore();
+
+  localRunTimerBar(LOCAL_DECIDE_WINDOW, ()=>{
+    if(LG.buzzedBy) return;
+    LG.buzzedBy = 'none';
+    document.getElementById('buzz-status').textContent = '⌛ 誰都沒按到，跳過這題';
+    document.getElementById('buzz-status').className = 'buzz-status warn';
+    document.querySelectorAll('#options-container .zone').forEach(z=> z.disabled = true);
+    setTimeout(localAdvanceRound, RESOLVE_DELAY);
+  });
+}
+
+function localOnPick(side, chosen, correctText){
+  if(!LG || LG.buzzedBy) return;
+  LG.buzzedBy = side;
+  localClearTimers();
+  localResolve(chosen === correctText, chosen, correctText);
+}
+
+function localResolve(isCorrect, chosen, correctText){
+  const item = LG.deck[LG.idx];
+  correctText = correctText || item.m;
+  document.querySelectorAll('#options-container .option-btn').forEach(row=>{
+    row.querySelectorAll('.zone').forEach(z=> z.disabled = true);
+    if(row.dataset.text === correctText) row.classList.add('correct');
+    else if(row.dataset.text === chosen) row.classList.add('wrong');
+  });
+
+  const buzzer = LG.buzzedBy;
+  const other = buzzer === 'p1' ? 'p2' : 'p1';
+  const st = document.getElementById('buzz-status');
+  const buzzerLabel = buzzer === 'p1' ? '玩家一 (A)' : '玩家二 (B)';
+
+  if(isCorrect){
+    const dmg = dmgForLevel(item.l);
+    LG.hp[other] = Math.max(0, LG.hp[other] - dmg);
+    LG.score[buzzer]++;
+    st.textContent = `⚡ ${buzzerLabel} 答對！造成 ${dmg} 傷害 🔥`;
+    st.className = 'buzz-status ' + buzzer;
+  } else {
+    LG.hp[buzzer] = Math.max(0, LG.hp[buzzer] - BACKLASH_DMG);
+    st.textContent = `💢 ${buzzerLabel} 答錯了，反噬 ${BACKLASH_DMG} 傷害！`;
+    st.className = 'buzz-status warn';
+  }
+  localRenderHpScore();
+  setTimeout(localAdvanceRound, RESOLVE_DELAY);
+}
+
+function localAdvanceRound(){
+  LG.idx++;
+  if(LG.hp.p1 <= 0 || LG.hp.p2 <= 0){
+    endLocalGame();
+  } else if(LG.idx >= LG.deck.length){
+    localEnterOvertime();
+  } else {
+    startLocalRound();
+  }
+}
+
+// 題目出完了，但雙方都還沒被擊倒：補一批同樣設定的題目，進延長賽繼續打到分出勝負
+function localEnterOvertime(){
+  localClearTimers();
+  const extra = buildDeck(lastLevelCounts || {1:12});
+  LG.deck = LG.deck.concat(extra);
+  showOvertimeBanner(()=> startLocalRound());
+}
+
+function endLocalGame(){
+  localClearTimers();
+  const winner = determineWinner(LG.hp, LG.score);
+  renderEndScreen(winner, '玩家一', '玩家二', LG.score.p1, LG.score.p2, LG.hp, LG.maxHp);
+}
+
+// 揭曉動畫：先顯示「誰贏了」的短動畫，播完才進入正式結算畫面
+function showWinnerReveal(winner, name1, name2, onDone){
+  const glow = document.getElementById('reveal-glow');
+  const icon = document.getElementById('reveal-icon');
+  const title = document.getElementById('reveal-title');
+  let color, text, emoji;
+  if(winner === 'draw'){ color = 'var(--gold)'; text = '平手！'; emoji = '🤝'; }
+  else if(winner === 'p1'){ color = 'var(--p1)'; text = name1 + ' 獲勝！'; emoji = '🏆'; }
+  else { color = 'var(--p2)'; text = name2 + ' 獲勝！'; emoji = '🏆'; }
+  glow.style.setProperty('--glow-color', color);
+  icon.textContent = emoji;
+  title.textContent = text;
+  showScreen('screen-reveal');
+  setTimeout(onDone, 2800);
+}
+
+// 延長賽提示：題目出完但雙方都還沒倒下時，先補題目、播一段提示動畫，再繼續對戰
+function showOvertimeBanner(onDone){
+  showScreen('screen-overtime');
+  setTimeout(()=>{
+    showScreen('screen-battle');
+    onDone();
+  }, 1500);
+}
+
+function renderEndScreen(winner, name1, name2, score1, score2, hp, maxHp){
+  showWinnerReveal(winner, name1, name2, ()=>{
+    const title = document.getElementById('end-title');
+    const sub = document.getElementById('end-sub');
+    const cap = maxHp || 100;
+    if(winner === 'draw'){
+      title.textContent = '🤝 平手！';
+      sub.textContent = '雙方勢均力敵';
+    } else {
+      const wName = winner === 'p1' ? name1 : name2;
+      title.textContent = '🏆 ' + wName + ' 獲勝！';
+      sub.textContent = `HP 剩餘 ${Math.max(0,hp.p1)} : ${Math.max(0,hp.p2)}（滿血 ${cap}）`;
+    }
+    document.getElementById('end-p1-score').textContent = score1;
+    document.getElementById('end-p2-score').textContent = score2;
+    document.getElementById('end-p1-label').textContent = name1 + '得分';
+    document.getElementById('end-p2-label').textContent = name2 + '得分';
+    showScreen('screen-end');
+  });
+}
+
+document.getElementById('btn-play-again').onclick = ()=>{
+  if(MY_ROLE === 'p1'){
+    onlineHostPlayAgain();
+  } else if(MY_ROLE === 'p2'){
+    const hostLabel = (hostDisplayName && hostDisplayName !== '房主') ? `${hostDisplayName}（房主）` : '房主';
+    alert(`連線對戰的「再來一場」要由 ${hostLabel} 那邊按下才會開始，請留在這個畫面等待對手動作。`);
+  } else if(lastLevelCounts){
+    startLocalGame(lastLevelCounts);
+  } else {
+    showScreen('screen-menu');
+  }
+};
+document.getElementById('btn-back-menu').onclick = ()=> showScreen('screen-menu');
+
+// ==========================================
+// 個人練習（沒有對手，不計時，答完顯示正確率）
+// ==========================================
+let PG = null; // practice game state
+
+function startPracticeSession(levelCounts){
+  const deck = buildDeck(levelCounts);
+  PG = { deck, idx:0, correct:0 };
+  document.getElementById('practice-progress-total').textContent = deck.length;
+  showScreen('screen-practice');
+  renderPracticeQuestion();
+}
+
+function renderPracticeQuestion(){
+  if(!PG || PG.idx >= PG.deck.length){ return endPracticeSession(); }
+  const item = PG.deck[PG.idx];
+  document.getElementById('practice-progress-cur').textContent = PG.idx + 1;
+  document.getElementById('practice-correct-count').textContent = PG.correct;
+
+  const tag = document.getElementById('practice-level-tag');
+  tag.textContent = 'Lv.' + item.l + ' ' + LEVEL_META[item.l].name;
+  tag.style.background = LEVEL_META[item.l].color;
+  document.getElementById('practice-word-display').textContent = item.w;
+  document.getElementById('practice-status').textContent = '';
+  document.getElementById('practice-status').className = 'buzz-status';
+
+  const opt = document.getElementById('practice-options-container');
+  opt.innerHTML = '';
+  item.options.forEach(text=>{
+    const b = document.createElement('button');
+    b.className = 'option-btn';
+    b.textContent = text;
+    b.onclick = ()=> practiceOnSelect(text, item.m);
+    opt.appendChild(b);
+  });
+}
+
+function practiceOnSelect(chosen, correctText){
+  const opt = document.getElementById('practice-options-container');
+  const isCorrect = chosen === correctText;
+  Array.from(opt.children).forEach(b=>{
+    b.disabled = true;
+    if(b.textContent === correctText) b.classList.add('correct');
+    else if(b.textContent === chosen) b.classList.add('wrong');
+  });
+  const st = document.getElementById('practice-status');
+  if(isCorrect){
+    PG.correct++;
+    document.getElementById('practice-correct-count').textContent = PG.correct;
+    st.textContent = '✅ 答對了！';
+    st.className = 'buzz-status p1';
+  } else {
+    st.textContent = '❌ 答錯了，正確答案是「' + correctText + '」';
+    st.className = 'buzz-status warn';
+  }
+  setTimeout(()=>{ PG.idx++; renderPracticeQuestion(); }, RESOLVE_DELAY);
+}
+
+function endPracticeSession(){
+  const total = PG.deck.length;
+  const correct = PG.correct;
+  const pct = total > 0 ? Math.round((correct/total)*100) : 0;
+  document.getElementById('practice-end-sub').textContent = `答對 ${correct} / ${total} 題`;
+  showScreen('screen-practice-end');
+  animateAccuracyBar(pct);
+}
+
+// 橫條跟數字一起用 JS 逐幀跑動畫（不是單純的 CSS transition），
+// 用 ease-out-quart 這種「先快後慢」的曲線，越接近目標百分比動畫越慢，更有到底的感覺。
+function animateAccuracyBar(pct){
+  const fill = document.getElementById('practice-accuracy-fill');
+  const label = document.getElementById('practice-end-accuracy');
+  const duration = 2400;
+  fill.style.transition = 'none';
+  fill.style.width = '0%';
+  label.textContent = '0%';
+
+  function easeOutQuart(t){ return 1 - Math.pow(1 - t, 4); }
+
+  const start = performance.now();
+  function tick(now){
+    const elapsed = now - start;
+    const t = Math.min(1, elapsed / duration);
+    const eased = easeOutQuart(t);
+    const current = Math.round(eased * pct);
+    fill.style.width = (eased * pct) + '%';
+    label.textContent = current + '%';
+    if(t < 1){
+      requestAnimationFrame(tick);
+    } else {
+      fill.style.width = pct + '%';
+      label.textContent = pct + '%';
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
+// ==========================================
+// 挑戰模式：連續答對，答錯就結束，難度隨連續答對題數自動提高。
+// 最高紀錄（最長連勝）存在裝置本機，玩法邏輯完全獨立於本機/連線/練習模式。
+// ==========================================
+let CG = null; // { streak }
+let challengeTimerRAF = null;
+const CHALLENGE_BASE_TIME = 8000; // 一開始每題 8 秒
+const CHALLENGE_MIN_TIME = 4000;  // 最少也會有 4 秒，不會壓到答不了題
+const CHALLENGE_TIME_STEP = 120;  // 每連對一題，時間再縮短一點，增加時間壓力
+
+function challengeClearTimer(){
+  if(challengeTimerRAF) cancelAnimationFrame(challengeTimerRAF);
+  challengeTimerRAF = null;
+}
+function challengeTimeForStreak(streak){
+  return Math.max(CHALLENGE_MIN_TIME, CHALLENGE_BASE_TIME - streak * CHALLENGE_TIME_STEP);
+}
+function challengeRunTimer(duration, onExpire){
+  const fill = document.getElementById('challenge-timer-fill');
+  fill.style.width = '100%';
+  const start = performance.now();
+  function tick(now){
+    const elapsed = now - start;
+    const pct = Math.max(0, 100 - (elapsed / duration) * 100);
+    fill.style.width = pct + '%';
+    if(elapsed >= duration){ challengeTimerRAF = null; onExpire(); return; }
+    challengeTimerRAF = requestAnimationFrame(tick);
+  }
+  challengeTimerRAF = requestAnimationFrame(tick);
+}
+
+document.getElementById('btn-mode-challenge').onclick = ()=>{
+  startChallengeMode();
+};
+
+// 難度基準大約每答對 5 題往上提一級、封頂在 Lv.6；
+// 用權重分布讓題目不會死板地卡在同一等級，難度基準附近的等級機率最高、離越遠機率越低。
+function pickLevelForStreak(streak){
+  const baseLevel = Math.min(6, 1 + Math.floor(streak / 5));
+  const weights = {};
+  for(let l = 1; l <= 6; l++){
+    const dist = Math.abs(l - baseLevel);
+    weights[l] = Math.max(1, 10 - dist * 4);
+  }
+  const total = Object.values(weights).reduce((a,b)=> a + b, 0);
+  let r = Math.random() * total;
+  for(let l = 1; l <= 6; l++){
+    r -= weights[l];
+    if(r <= 0) return l;
+  }
+  return baseLevel;
+}
+
+function buildChallengeQuestion(streak){
+  const level = pickLevelForStreak(streak);
+  const pool = getDataForLevel(level);
+  const [w, m] = pool[Math.floor(Math.random() * pool.length)];
+  let options = [m];
+  let guard = 0;
+  while(options.length < 5 && guard < 200){
+    guard++;
+    const randLevel = 1 + Math.floor(Math.random() * 6);
+    const randPool = getDataForLevel(randLevel);
+    const rand = randPool[Math.floor(Math.random() * randPool.length)];
+    if(!options.includes(rand[1])) options.push(rand[1]);
+  }
+  shuffle(options);
+  return { w, m, l: level, options };
+}
+
+function startChallengeMode(){
+  CG = { streak: 0 };
+  document.getElementById('challenge-streak').textContent = '0';
+  showCountdown(()=>{
+    showScreen('screen-challenge');
+    nextChallengeQuestion();
+  });
+}
+
+function nextChallengeQuestion(){
+  challengeClearTimer();
+  const item = buildChallengeQuestion(CG.streak);
+  CG.current = item;
+
+  const tag = document.getElementById('challenge-level-tag');
+  tag.textContent = 'Lv.' + item.l + ' ' + LEVEL_META[item.l].name;
+  tag.style.background = LEVEL_META[item.l].color;
+  document.getElementById('challenge-word-display').textContent = item.w;
+  document.getElementById('challenge-status').textContent = '';
+  document.getElementById('challenge-status').className = 'buzz-status';
+  document.getElementById('challenge-streak').textContent = CG.streak;
+
+  const opt = document.getElementById('challenge-options-container');
+  opt.innerHTML = '';
+  item.options.forEach(text=>{
+    const b = document.createElement('button');
+    b.className = 'option-btn';
+    b.textContent = text;
+    b.onclick = ()=> challengeOnSelect(text, item.m);
+    opt.appendChild(b);
+  });
+
+  challengeRunTimer(challengeTimeForStreak(CG.streak), ()=> challengeOnTimeout(item));
+}
+
+function challengeOnTimeout(item){
+  const opt = document.getElementById('challenge-options-container');
+  Array.from(opt.children).forEach(b=>{
+    b.disabled = true;
+    if(b.textContent === item.m) b.classList.add('correct');
+  });
+  const st = document.getElementById('challenge-status');
+  st.textContent = '⌛ 時間到！正確答案是「' + item.m + '」';
+  st.className = 'buzz-status warn';
+  setTimeout(endChallengeMode, RESOLVE_DELAY);
+}
+
+function challengeOnSelect(chosen, correctText){
+  challengeClearTimer();
+  const opt = document.getElementById('challenge-options-container');
+  const isCorrect = chosen === correctText;
+  Array.from(opt.children).forEach(b=>{
+    b.disabled = true;
+    if(b.textContent === correctText) b.classList.add('correct');
+    else if(b.textContent === chosen) b.classList.add('wrong');
+  });
+
+  const st = document.getElementById('challenge-status');
+  if(isCorrect){
+    CG.streak++;
+    document.getElementById('challenge-streak').textContent = CG.streak;
+    st.textContent = '✅ 答對了！繼續！';
+    st.className = 'buzz-status p1';
+    setTimeout(nextChallengeQuestion, RESOLVE_DELAY);
+  } else {
+    st.textContent = '❌ 答錯了，正確答案是「' + correctText + '」';
+    st.className = 'buzz-status warn';
+    setTimeout(endChallengeMode, RESOLVE_DELAY);
+  }
+}
+
+function endChallengeMode(){
+  challengeClearTimer();
+  const finalStreak = CG.streak;
+  const isNewRecord = finalStreak > challengeHigh;
+  if(isNewRecord){
+    challengeHigh = finalStreak;
+    saveChallengeHigh(challengeHigh);
+    updateMenuChallengeHigh();
+  }
+  document.getElementById('challenge-end-title').textContent = isNewRecord ? '🎉 新紀錄！' : '💥 挑戰結束！';
+  document.getElementById('challenge-end-sub').textContent = `連續答對 ${finalStreak} 題`;
+  document.getElementById('challenge-end-high').textContent = challengeHigh;
+  showScreen('screen-challenge-end');
+}
+
+document.getElementById('btn-challenge-again').onclick = ()=> startChallengeMode();
+document.getElementById('btn-challenge-back-menu').onclick = ()=> showScreen('screen-menu');
+document.getElementById('challenge-back-btn').onclick = ()=>{ challengeClearTimer(); showScreen('screen-menu'); };
+
+document.getElementById('btn-practice-again').onclick = ()=>{
+  startPracticeSession(lastLevelCounts || {1:12});
+};
+document.getElementById('btn-practice-back-menu').onclick = ()=> showScreen('screen-menu');
+
+// ==========================================
+// 連線對戰（WebRTC 點對點直連，透過 PeerJS）
+// 不需要申請任何帳號：兩邊瀏覽器直接連線傳資料，只借用 PeerJS 提供的
+// 公開「牽線」伺服器幫忙對上線（之後遊戲資料就直接兩機互傳）。
+// 判定方式跟本機雙人對戰一致：不是比誰先按「搶答鍵」，而是直接比誰先點到選項──
+// 房主＝連線中的權威端，兩邊誰的「點選」訊息先送到房主，房主就以那個人的選擇判定整題結果。
+// ==========================================
+let ROOM_CODE = null;
+let MY_ROLE = null;      // 'p1' (房主) | 'p2' (加入者)
+let peer = null;         // 這台裝置的 PeerJS 物件
+let conn = null;         // 與對方的直連通道
+let ONLINE = null;       // 這台裝置看到的對戰狀態（房主是權威版本，玩家二是鏡射）
+let hostRoundTimeout = null;
+let onlineTickHandle = null;
+let lastRenderedIdx = -1;
+const ONLINE_DECIDE_WINDOW = 9000; // 跟本機雙人對戰的作答時間一致
+
+function genRoomCode(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for(let i=0;i<5;i++) s += chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+function peerIdFor(code){ return 'wordduel-' + code; }
+function sendToPeer(msg){ if(conn && conn.open) conn.send(msg); }
+function msgOf(type, payload){ return Object.assign({type}, payload || {}); }
+
+function cleanupOnline(){
+  clearTimeout(hostRoundTimeout);
+  if(onlineTickHandle) clearInterval(onlineTickHandle);
+  if(conn){ try{ conn.close(); }catch(e){} }
+  if(peer){ try{ peer.destroy(); }catch(e){} }
+  conn = null; peer = null; ROOM_CODE = null; MY_ROLE = null; ONLINE = null; lastRenderedIdx = -1;
+}
+
+function handlePeerDisconnect(){
+  if(document.getElementById('screen-battle').classList.contains('hidden')) return; // 不在對戰畫面（例如已經在結算畫面等對手再來一場）就不用跳提示
+  alert('對手已離線，連線中斷了。');
+  cleanupOnline();
+  showScreen('screen-menu');
+}
+
+// ---------- 房主（建立房間）----------
+function createOnlineRoom(levelCounts){
+  const deck = buildDeck(levelCounts);
+  const hp0 = computeStartHP(deck);
+  const code = genRoomCode();
+  MY_ROLE = 'p1';
+  ROOM_CODE = code;
+  hostDisplayName = playerName || '房主';
+  guestDisplayName = '';
+  ONLINE = { deck, maxHp:hp0, totalRounds: deck.length, idx:0, hp:{p1:hp0,p2:hp0}, score:{p1:0,p2:0}, round:null };
+
+  document.getElementById('waiting-code').textContent = code;
+  showScreen('screen-waiting');
+
+  peer = new Peer(peerIdFor(code));
+  peer.on('connection', (c)=>{
+    conn = c;
+    conn.on('open', ()=>{
+      sendToPeer(msgOf('init', { deck: ONLINE.deck, maxHp: ONLINE.maxHp, totalRounds: ONLINE.totalRounds, hostName: hostDisplayName }));
+      enterOnlineBattle(hostStartRound);
+    });
+    conn.on('data', hostHandleMessage);
+    conn.on('close', handlePeerDisconnect);
+  });
+  peer.on('error', (err)=>{
+    if(err && err.type === 'unavailable-id'){
+      try{ peer.destroy(); }catch(e){}
+      createOnlineRoom(levelCounts); // 房號極少數衝突，換一組重試
+    } else {
+      alert('建立房間時發生連線問題，請確認網路後再試一次。');
+      cleanupOnline();
+      showScreen('screen-menu');
+    }
+  });
+}
+
+document.getElementById('btn-cancel-room').onclick = ()=>{
+  cleanupOnline();
+  showScreen('screen-menu');
+};
+
+// ---------- 玩家二（輸入代碼加入）----------
+document.getElementById('btn-join-confirm').onclick = ()=>{
+  const codeInput = document.getElementById('join-code-input');
+  const code = codeInput.value.trim().toUpperCase();
+  const errBox = document.getElementById('join-error');
+  errBox.style.color = '';
+  errBox.textContent = '';
+  if(!code){ errBox.textContent = '請輸入房間代碼'; return; }
+
+  MY_ROLE = 'p2';
+  ROOM_CODE = code;
+  guestDisplayName = playerName || '玩家二';
+  hostDisplayName = '';
+  errBox.textContent = '連線中…';
+
+  peer = new Peer();
+  peer.on('open', ()=>{
+    conn = peer.connect(peerIdFor(code), { reliable:true });
+    conn.on('open', ()=>{
+      errBox.style.color = 'var(--good)';
+      errBox.textContent = '已連線，等待房主開始對戰…';
+      sendToPeer(msgOf('hello', { name: guestDisplayName }));
+    });
+    conn.on('data', guestHandleMessage);
+    conn.on('close', handlePeerDisconnect);
+    conn.on('error', ()=>{ errBox.style.color=''; errBox.textContent = '找不到這個房間，請確認代碼是否正確。'; });
+  });
+  peer.on('error', (err)=>{
+    if(err && err.type === 'peer-unavailable'){
+      errBox.style.color = '';
+      errBox.textContent = '找不到這個房間，請確認代碼是否正確。';
+    } else {
+      errBox.style.color = '';
+      errBox.textContent = '連線發生問題，請確認網路後再試一次。';
+    }
+  });
+};
+
+function guestHandleMessage(msg){
+  switch(msg.type){
+    case 'init':
+      // 只有在對方真的有送名字時才覆蓋，避免「再來一場」等情況下把已知的房主名字洗成預設值
+      if(msg.hostName) hostDisplayName = String(msg.hostName).slice(0,12);
+      if(!hostDisplayName) hostDisplayName = '房主';
+      ONLINE = { deck: msg.deck, maxHp: msg.maxHp, totalRounds: msg.totalRounds, idx:0,
+                 hp:{p1:msg.maxHp, p2:msg.maxHp}, score:{p1:0,p2:0}, round:null };
+      enterOnlineBattle();
+      break;
+    case 'round-start':
+      lastRenderedIdx = -1;
+      ONLINE.idx = msg.idx;
+      ONLINE.round = { roundStartTs: msg.ts, resolved:false, resolvedBy:null, chosen:null, correctness:null, expired:false };
+      onlineRenderFromState();
+      break;
+    case 'answer-result':
+      ONLINE.round.resolved = true;
+      ONLINE.round.resolvedBy = msg.resolvedBy;
+      ONLINE.round.chosen = msg.chosen;
+      ONLINE.round.correctness = msg.correct;
+      ONLINE.hp = msg.hp; ONLINE.score = msg.score;
+      onlineRenderFromState();
+      break;
+    case 'round-timeout':
+      ONLINE.round.expired = true;
+      onlineRenderFromState();
+      break;
+    case 'overtime':
+      ONLINE.deck = ONLINE.deck.concat(msg.extraDeck);
+      showOvertimeBanner(()=>{}); // 玩家二不主導出題，只需要跟房主一起看動畫、等房主送下一題
+      break;
+    case 'game-over':
+      ONLINE.hp = msg.hp; ONLINE.score = msg.score;
+      if(onlineTickHandle) clearInterval(onlineTickHandle);
+      { const maxHp = ONLINE.maxHp;
+        renderEndScreen(msg.winner, hostDisplayName || '房主', guestDisplayName || '玩家二', msg.score.p1, msg.score.p2, msg.hp, maxHp); }
+      break;
+  }
+}
+
+// 玩家二點了某個選項，把「想選的答案」送給房主判定（不是先搶按鍵，點下去的當下就是答案）
+function guestSendAnswer(text){
+  if(!ONLINE || !ONLINE.round || ONLINE.round.resolved || ONLINE.round.expired) return;
+  sendToPeer(msgOf('answer-attempt', { text }));
+}
+
+// ---------- 房主端：權威判定邏輯 ----------
+function hostHandleMessage(msg){
+  if(msg.type === 'answer-attempt'){
+    hostTryAnswer('p2', msg.text);
+  } else if(msg.type === 'hello'){
+    guestDisplayName = (msg.name || '').slice(0,12) || '玩家二';
+    onlineUpdateNames();
+  }
+}
+
+function hostStartRound(){
+  if(ONLINE.hp.p1 <= 0 || ONLINE.hp.p2 <= 0 || ONLINE.idx >= ONLINE.deck.length){ return hostEndGame(); }
+  clearTimeout(hostRoundTimeout);
+  lastRenderedIdx = -1;
+  ONLINE.round = { roundStartTs: Date.now(), resolved:false, resolvedBy:null, chosen:null, correctness:null, expired:false };
+  sendToPeer(msgOf('round-start', { idx: ONLINE.idx, ts: ONLINE.round.roundStartTs }));
+  onlineRenderFromState();
+  hostRoundTimeout = setTimeout(()=>{
+    if(ONLINE.round.resolved) return;
+    ONLINE.round.expired = true;
+    sendToPeer(msgOf('round-timeout'));
+    onlineRenderFromState();
+    setTimeout(hostAdvanceRound, RESOLVE_DELAY);
+  }, ONLINE_DECIDE_WINDOW);
+}
+
+// role 送出的答案：誰先送到（不管房主自己點的，還是玩家二傳過來的訊息），就以那個人的選擇判定整題
+function hostTryAnswer(role, text){
+  if(!ONLINE.round || ONLINE.round.resolved || ONLINE.round.expired) return;
+  clearTimeout(hostRoundTimeout);
+  const item = ONLINE.deck[ONLINE.idx];
+  hostResolveRound(role, text === item.m, text);
+}
+
+function hostResolveRound(resolvedBy, isCorrect, chosen){
+  const item = ONLINE.deck[ONLINE.idx];
+  const other = resolvedBy === 'p1' ? 'p2' : 'p1';
+  if(isCorrect){
+    const dmg = dmgForLevel(item.l);
+    ONLINE.hp[other] = Math.max(0, ONLINE.hp[other] - dmg);
+    ONLINE.score[resolvedBy]++;
+  } else {
+    ONLINE.hp[resolvedBy] = Math.max(0, ONLINE.hp[resolvedBy] - BACKLASH_DMG);
+  }
+  ONLINE.round.resolved = true;
+  ONLINE.round.resolvedBy = resolvedBy;
+  ONLINE.round.chosen = chosen;
+  ONLINE.round.correctness = isCorrect;
+  sendToPeer(msgOf('answer-result', { resolvedBy, chosen, correct:isCorrect, hp:ONLINE.hp, score:ONLINE.score }));
+  onlineRenderFromState();
+  setTimeout(hostAdvanceRound, RESOLVE_DELAY);
+}
+
+function hostAdvanceRound(){
+  ONLINE.idx++;
+  if(ONLINE.hp.p1 <= 0 || ONLINE.hp.p2 <= 0){
+    hostEndGame();
+  } else if(ONLINE.idx >= ONLINE.deck.length){
+    hostEnterOvertime();
+  } else {
+    hostStartRound();
+  }
+}
+
+// 題目出完了但雙方都還沒被擊倒：補一批同樣設定的題目給雙方（保持牌組一致），
+// 播延長賽提示動畫，播完後繼續出題
+function hostEnterOvertime(){
+  clearTimeout(hostRoundTimeout);
+  const extra = buildDeck(lastLevelCounts || {1:12});
+  ONLINE.deck = ONLINE.deck.concat(extra);
+  sendToPeer(msgOf('overtime', { extraDeck: extra }));
+  showOvertimeBanner(()=> hostStartRound());
+}
+
+function hostEndGame(){
+  const winner = determineWinner(ONLINE.hp, ONLINE.score);
+  sendToPeer(msgOf('game-over', { winner, hp: ONLINE.hp, score: ONLINE.score }));
+  clearTimeout(hostRoundTimeout);
+  if(onlineTickHandle) clearInterval(onlineTickHandle);
+  const maxHp = ONLINE.maxHp, score = ONLINE.score, hp = ONLINE.hp;
+  renderEndScreen(winner, hostDisplayName || '房主', guestDisplayName || '玩家二', score.p1, score.p2, hp, maxHp);
+}
+
+// 房主按下「再來一場」：沿用同一條連線，直接用上一場相同的等級/題數設定開新的一場，
+// 不需要重新產生房間代碼、玩家二也不用重新輸入代碼加入。若對手已經離線就提示並回主選單。
+function onlineHostPlayAgain(){
+  if(!conn || !conn.open){
+    alert('對手已經離線了，沒辦法直接再來一場，請重新建立房間邀請對手加入。');
+    cleanupOnline();
+    showScreen('screen-menu');
+    return;
+  }
+  const deck = buildDeck(lastLevelCounts || {1:12});
+  const hp0 = computeStartHP(deck);
+  ONLINE = { deck, maxHp:hp0, totalRounds: deck.length, idx:0, hp:{p1:hp0,p2:hp0}, score:{p1:0,p2:0}, round:null };
+  sendToPeer(msgOf('init', { deck: ONLINE.deck, maxHp: ONLINE.maxHp, totalRounds: ONLINE.totalRounds, hostName: hostDisplayName }));
+  enterOnlineBattle(hostStartRound);
+}
+
+// ---------- 共用：畫面渲染 ----------
+function onlineUpdateNames(){
+  document.getElementById('p1-name').textContent = hostDisplayName || '房主';
+  document.getElementById('p2-name').textContent = guestDisplayName || '玩家二';
+}
+function enterOnlineBattle(afterReady){
+  onlineUpdateNames();
+  document.getElementById('p1-hp-num').textContent = ONLINE.maxHp;
+  document.getElementById('p2-hp-num').textContent = ONLINE.maxHp;
+  showCountdown(()=>{
+    showScreen('screen-battle');
+    onlineRenderFromState();
+    onlineTickHandle = setInterval(onlineTick, 150);
+    if(afterReady) afterReady();
+  });
+}
+
+function onlineRenderFromState(){
+  if(!ONLINE || !ONLINE.deck) return;
+  const maxHp = ONLINE.maxHp || 100;
+  document.getElementById('p1-hp').style.width = Math.max(0, ONLINE.hp.p1/maxHp*100) + '%';
+  document.getElementById('p2-hp').style.width = Math.max(0, ONLINE.hp.p2/maxHp*100) + '%';
+  animateHpNumber('p1-hp-num', Math.max(0, ONLINE.hp.p1));
+  animateHpNumber('p2-hp-num', Math.max(0, ONLINE.hp.p2));
+  document.getElementById('p1-score').textContent = ONLINE.score.p1;
+  document.getElementById('p2-score').textContent = ONLINE.score.p2;
+
+  if(ONLINE.idx >= ONLINE.deck.length || !ONLINE.round) return;
+  const item = ONLINE.deck[ONLINE.idx];
+  const tag = document.getElementById('word-level-tag');
+  tag.textContent = 'Lv.' + item.l + ' ' + LEVEL_META[item.l].name;
+  tag.style.background = LEVEL_META[item.l].color;
+  document.getElementById('word-display').textContent = item.w;
+
+  const r = ONLINE.round;
+
+  if(ONLINE.idx !== lastRenderedIdx){
+    lastRenderedIdx = ONLINE.idx;
+    const opt = document.getElementById('options-container');
+    opt.innerHTML = '';
+    item.options.forEach(text=>{
+      const b = document.createElement('button');
+      b.className = 'option-btn';
+      b.textContent = text;
+      b.disabled = false; // 一開始就能點，看誰先點到正確答案
+      const submit = ()=>{
+        if(MY_ROLE === 'p1') hostTryAnswer('p1', text);
+        else guestSendAnswer(text);
+      };
+      b.onpointerdown = submit;
+      b.onclick = submit;
+      opt.appendChild(b);
+    });
+  }
+
+  const st = document.getElementById('buzz-status');
+
+  if(r.resolved){
+    document.querySelectorAll('#options-container .option-btn').forEach(b=>{
+      b.disabled = true;
+      if(b.textContent === item.m) b.classList.add('correct');
+      else if(b.textContent === r.chosen) b.classList.add('wrong');
+    });
+    const label = r.resolvedBy === 'p1' ? (hostDisplayName || '房主') : (guestDisplayName || '玩家二');
+    if(r.correctness){
+      st.textContent = '⚡ ' + label + ' 最快點到正確答案！造成傷害 🔥';
+      st.className = 'buzz-status ' + r.resolvedBy;
+    } else {
+      st.textContent = '💢 ' + label + ' 點錯了，反噬傷害！';
+      st.className = 'buzz-status warn';
+    }
+  } else if(r.expired){
+    st.textContent = '⌛ 誰都沒點到，跳過這題';
+    st.className = 'buzz-status warn';
+    document.querySelectorAll('#options-container .option-btn').forEach(b=> b.disabled = true);
+  } else {
+    st.textContent = '看誰先點到正確答案！';
+    st.className = 'buzz-status';
+  }
+}
+
+// 純畫面用的讀秒動畫；實際逾時判定一律由房主的 setTimeout 負責，這裡不做任何狀態變更，
+// 避免雙方各自判斷逾時而衝突。
+function onlineTick(){
+  if(!ONLINE || !ONLINE.round) return;
+  const r = ONLINE.round;
+  const fill = document.getElementById('round-timer-fill');
+  if(r.resolved || r.expired){ fill.style.width = '0%'; return; }
+  const elapsed = Date.now() - r.roundStartTs;
+  const pct = Math.max(0, 100 - (elapsed/ONLINE_DECIDE_WINDOW)*100);
+  fill.style.width = pct + '%';
+}
+
+// 離開結算畫面時清乾淨連線資源
+document.getElementById('btn-back-menu').addEventListener('click', cleanupOnline);
+
+// ==========================================
+// 團體戰（多人連線，單敗淘汰賽，賽末比出前三名）
+// 架構：星狀拓撲——除了主持人以外的所有參賽者都直接連到主持人的 Peer，彼此之間沒有
+// 直連。每一輪、每一場比賽的判定全部由主持人這台裝置權威處理（跟 1v1 連線對戰的房主
+// 權威模式同一個精神，只是主持人要同時看管好幾場比賽，訊息都多帶一個 matchId 表明是哪一場）。
+// 人數不是 2 的冪次時，用隨機輪空(bye)補位；準決賽的兩位輸家用「答對題數→總傷害」
+// 決定季軍，不額外加賽。
+// ==========================================
+let TOUR_ROLE = null;        // 'host' | 'guest' | null
+let TOUR_CODE = null;
+let tourPeer = null;         // 自己的 PeerJS 物件
+let tourConns = {};          // 主持人限定：{participantId: DataConnection}
+let tourHostConn = null;     // 參賽者限定：連到主持人的連線
+let tourMyId = null;         // 自己的 participantId（主持人固定是 'host'）
+let tourMyName = '';
+let tourLevelCounts = null;  // 這場賽事共用的等級/題數設定
+let TOURNAMENT = null;       // 主持人端權威賽事資料
+let tourMyMatchId = null;    // 自己目前這一輪被分配到的比賽 id（沒有比賽時是 null）
+let tourMyRole = null;       // 自己在 tourMyMatchId 這場比賽裡是 'p1' 還是 'p2'
+let tourGuestMatch = null;   // 參賽者端：自己這場比賽的鏡射狀態
+let tourGuestBracketSnapshot = null; // 賽程表快照，兩端都用同一份資料渲染 screen-tournament-bracket
+let tourRoundTimeouts = {};  // 主持人限定：{matchId: timeoutHandle}
+let tourLastRenderedIdx = -1;
+let tourTickHandle = null;
+const TOUR_DECIDE_WINDOW = 9000;
+const TOUR_COUNTDOWN_MS = 3100; // 跟 showCountdown() 的總長度一致，讓沒有參與該場比賽的主持人也用同樣的延遲才開始計時，公平起見
+
+function tourPeerIdFor(code){ return 'wordduel-tour-' + code; }
+function tourSendTo(id, msg){ const c = tourConns[id]; if(c && c.open) c.send(msg); }
+function tourBroadcast(msg){ Object.keys(tourConns).forEach(id=> tourSendTo(id, msg)); }
+function tourSendToHost(msg){ if(tourHostConn && tourHostConn.open) tourHostConn.send(msg); }
+function tourMatchBroadcast(m, msg){
+  if(m.p1Id !== 'host') tourSendTo(m.p1Id, msg);
+  if(m.p2Id !== 'host') tourSendTo(m.p2Id, msg);
+}
+function tourNameOf(id){
+  if(!TOURNAMENT) return '';
+  const p = TOURNAMENT.participants.find(p=>p.id===id);
+  return p ? p.name : '';
+}
+
+function cleanupTournament(){
+  Object.values(tourRoundTimeouts).forEach(h=> clearTimeout(h));
+  tourRoundTimeouts = {};
+  if(tourTickHandle) clearInterval(tourTickHandle);
+  Object.values(tourConns).forEach(c=>{ try{ c.close(); }catch(e){} });
+  tourConns = {};
+  if(tourHostConn){ try{ tourHostConn.close(); }catch(e){} }
+  tourHostConn = null;
+  if(tourPeer){ try{ tourPeer.destroy(); }catch(e){} }
+  tourPeer = null;
+  TOUR_ROLE = null; TOUR_CODE = null; tourMyId = null; TOURNAMENT = null;
+  tourMyMatchId = null; tourMyRole = null; tourGuestMatch = null; tourGuestBracketSnapshot = null;
+  tourLastRenderedIdx = -1;
+}
+
+// ---------- 建立賽事（主持人）----------
+function createTournamentRoom(levelCounts){
+  tourLevelCounts = levelCounts;
+  const code = genRoomCode();
+  TOUR_ROLE = 'host';
+  TOUR_CODE = code;
+  tourMyId = 'host';
+  tourMyName = playerName || '主持人';
+  TOURNAMENT = {
+    code,
+    participants: [{ id:'host', name: tourMyName }],
+    started: false,
+    rounds: [],
+    matches: {},
+    semiLosers: null,
+    thirdPlace: null,
+    champion: null,
+    runnerUp: null
+  };
+  renderTourLobby();
+  showScreen('screen-tournament-lobby');
+
+  tourPeer = new Peer(tourPeerIdFor(code));
+  tourPeer.on('connection', (c)=>{
+    const pid = c.peer;
+    c.on('open', ()=>{ tourConns[pid] = c; });
+    c.on('data', (msg)=> tourHostHandleMessage(pid, msg));
+    c.on('close', ()=> tourHostHandleDisconnect(pid));
+  });
+  tourPeer.on('error', (err)=>{
+    if(err && err.type === 'unavailable-id'){
+      try{ tourPeer.destroy(); }catch(e){}
+      createTournamentRoom(levelCounts);
+    } else {
+      alert('建立賽事時發生連線問題，請確認網路後再試一次。');
+      cleanupTournament();
+      showScreen('screen-menu');
+    }
+  });
+}
+
+document.getElementById('btn-tour-lobby-cancel').onclick = ()=>{
+  cleanupTournament();
+  showScreen('screen-menu');
+};
+document.getElementById('btn-tour-bracket-leave').onclick = ()=>{
+  cleanupTournament();
+  showScreen('screen-menu');
+};
+document.getElementById('btn-tour-end-back-menu').onclick = ()=>{
+  cleanupTournament();
+  showScreen('screen-menu');
+};
+
+function renderTourLobby(){
+  document.getElementById('tour-lobby-code').textContent = TOUR_CODE || '------';
+  const list = document.getElementById('tour-lobby-list');
+  list.innerHTML = '';
+  TOURNAMENT.participants.forEach(p=>{
+    const row = document.createElement('div');
+    row.className = 'tour-participant-row';
+    row.textContent = (p.id === 'host' ? '👑 ' : '👤 ') + p.name;
+    list.appendChild(row);
+  });
+  document.getElementById('tour-lobby-count').textContent = TOURNAMENT.participants.length;
+  const startBtn = document.getElementById('btn-tour-start');
+  startBtn.classList.remove('hidden');
+  startBtn.disabled = TOURNAMENT.participants.length < 2;
+  document.getElementById('tour-lobby-hint').textContent = TOURNAMENT.participants.length < 2
+    ? '至少需要 2 人才能開賽，把代碼分享給大家吧！'
+    : `目前 ${TOURNAMENT.participants.length} 人，可以隨時開賽，人數不是 2 的倍數時會自動用輪空補位。`;
+}
+
+document.getElementById('btn-tour-start').onclick = ()=>{
+  if(!TOURNAMENT || TOURNAMENT.participants.length < 2 || TOURNAMENT.started) return;
+  TOURNAMENT.started = true;
+  document.getElementById('btn-tour-start').disabled = true;
+  tourBuildRound(TOURNAMENT.participants.slice());
+};
+
+// ---------- 加入賽事（參賽者）----------
+document.getElementById('btn-tour-join').onclick = ()=>{
+  document.getElementById('tour-join-code-box').classList.remove('hidden');
+};
+document.getElementById('btn-tour-join-confirm').onclick = ()=>{
+  const codeInput = document.getElementById('tour-join-code-input');
+  const code = codeInput.value.trim().toUpperCase();
+  const errBox = document.getElementById('tour-join-error');
+  errBox.style.color = ''; errBox.textContent = '';
+  if(!code){ errBox.textContent = '請輸入賽事代碼'; return; }
+
+  TOUR_ROLE = 'guest';
+  TOUR_CODE = code;
+  tourMyName = playerName || '玩家';
+  errBox.textContent = '連線中…';
+
+  tourPeer = new Peer();
+  tourPeer.on('open', (myPeerId)=>{
+    tourMyId = myPeerId;
+    tourHostConn = tourPeer.connect(tourPeerIdFor(code), { reliable:true });
+    tourHostConn.on('open', ()=>{
+      errBox.style.color = 'var(--good)';
+      errBox.textContent = '已連線，等待主持人開始賽事…';
+      tourSendToHost({ type:'tour-hello', name: tourMyName });
+      renderTourLobbyGuest([]);
+      showScreen('screen-tournament-lobby');
+    });
+    tourHostConn.on('data', tourGuestHandleMessage);
+    tourHostConn.on('close', tourGuestHandleHostGone);
+    tourHostConn.on('error', ()=>{ errBox.style.color=''; errBox.textContent = '找不到這場賽事，請確認代碼是否正確。'; });
+  });
+  tourPeer.on('error', (err)=>{
+    if(err && err.type === 'peer-unavailable'){
+      errBox.style.color = ''; errBox.textContent = '找不到這場賽事，請確認代碼是否正確。';
+    } else {
+      errBox.style.color = ''; errBox.textContent = '連線發生問題，請確認網路後再試一次。';
+    }
+  });
+};
+
+function renderTourLobbyGuest(participants){
+  document.getElementById('tour-lobby-code').textContent = TOUR_CODE || '------';
+  const list = document.getElementById('tour-lobby-list');
+  list.innerHTML = '';
+  participants.forEach(p=>{
+    const row = document.createElement('div');
+    row.className = 'tour-participant-row';
+    row.textContent = (p.id === 'host' ? '👑 ' : '👤 ') + p.name;
+    list.appendChild(row);
+  });
+  document.getElementById('tour-lobby-count').textContent = participants.length;
+  document.getElementById('btn-tour-start').classList.add('hidden');
+  document.getElementById('tour-lobby-hint').textContent = '等待主持人開賽…';
+}
+
+function tourGuestHandleHostGone(){
+  const endScreen = document.getElementById('screen-tournament-end');
+  if(endScreen && !endScreen.classList.contains('hidden')) return; // 賽事已正常結束，不用跳警告
+  alert('主持人已離線，賽事中斷了。');
+  cleanupTournament();
+  showScreen('screen-menu');
+}
+
+function tourGuestHandleMessage(msg){
+  switch(msg.type){
+    case 'tour-too-late':
+      alert('賽事已經開始了，沒辦法中途加入，請等主持人開下一場。');
+      cleanupTournament();
+      showScreen('screen-menu');
+      break;
+    case 'tour-lobby-update':
+      renderTourLobbyGuest(msg.participants);
+      break;
+    case 'tour-match-assign':
+      tourMyMatchId = msg.matchId;
+      tourMyRole = msg.myRole;
+      tourGuestMatch = {
+        p1Name: msg.myRole === 'p1' ? msg.myName : msg.oppName,
+        p2Name: msg.myRole === 'p1' ? msg.oppName : msg.myName,
+        deck: msg.deck, maxHp: msg.maxHp, idx:0,
+        hp:{p1:msg.maxHp, p2:msg.maxHp}, score:{p1:0,p2:0}, round:null
+      };
+      tourEnterBattleScreen();
+      break;
+    case 'tour-bye-advance':
+      renderTourBracketScreen('🎉 這輪輪空，直接晉級下一輪！等待其他比賽結束…');
+      showScreen('screen-tournament-bracket');
+      break;
+    case 'tour-round-start':
+      if(msg.matchId !== tourMyMatchId || !tourGuestMatch) return;
+      tourLastRenderedIdx = -1;
+      tourGuestMatch.idx = msg.idx;
+      tourGuestMatch.round = { roundStartTs: msg.ts, resolved:false, resolvedBy:null, chosen:null, correctness:null, expired:false };
+      tourRenderFromState();
+      break;
+    case 'tour-answer-result':
+      if(msg.matchId !== tourMyMatchId || !tourGuestMatch) return;
+      tourGuestMatch.round.resolved = true;
+      tourGuestMatch.round.resolvedBy = msg.resolvedBy;
+      tourGuestMatch.round.chosen = msg.chosen;
+      tourGuestMatch.round.correctness = msg.correct;
+      tourGuestMatch.hp = msg.hp; tourGuestMatch.score = msg.score;
+      tourRenderFromState();
+      break;
+    case 'tour-round-timeout':
+      if(msg.matchId !== tourMyMatchId || !tourGuestMatch) return;
+      tourGuestMatch.round.expired = true;
+      tourRenderFromState();
+      break;
+    case 'tour-overtime':
+      if(msg.matchId !== tourMyMatchId || !tourGuestMatch) return;
+      tourGuestMatch.deck = tourGuestMatch.deck.concat(msg.extraDeck);
+      showOvertimeBanner(()=>{});
+      break;
+    case 'tour-match-over':
+      if(msg.matchId !== tourMyMatchId || !tourGuestMatch) return;
+      tourGuestMatch.hp = msg.hp; tourGuestMatch.score = msg.score;
+      tourHandleMyMatchOver(msg.matchId, msg.winnerId, tourGuestMatch.p1Name, tourGuestMatch.p2Name);
+      break;
+    case 'tour-bracket-update':
+      tourGuestBracketSnapshot = msg;
+      { const sc = document.getElementById('screen-tournament-bracket');
+        if(sc && !sc.classList.contains('hidden')) renderTourBracketList(msg); }
+      break;
+    case 'tour-final':
+      tourRenderFinal(msg);
+      break;
+  }
+}
+
+// 參賽者點了某個選項，把「想選的答案」送給主持人判定（跟 1v1 連線對戰同一套判定精神）
+function tourGuestSendAnswer(text){
+  if(!tourGuestMatch || !tourGuestMatch.round || tourGuestMatch.round.resolved || tourGuestMatch.round.expired) return;
+  tourSendToHost({ type:'tour-answer-attempt', matchId: tourMyMatchId, text });
+}
+
+// ---------- 主持人端：訊息與斷線處理 ----------
+function tourHostHandleMessage(pid, msg){
+  if(msg.type === 'tour-hello'){
+    if(TOURNAMENT.started){
+      tourSendTo(pid, { type:'tour-too-late' });
+      return;
+    }
+    const name = (msg.name || '').slice(0,12) || '玩家';
+    if(!TOURNAMENT.participants.find(p=>p.id===pid)){
+      TOURNAMENT.participants.push({ id:pid, name });
+    }
+    renderTourLobby();
+    tourBroadcast({ type:'tour-lobby-update', participants: TOURNAMENT.participants });
+  } else if(msg.type === 'tour-answer-attempt'){
+    tourHostTryAnswer(msg.matchId, tourRoleOf(msg.matchId, pid), msg.text);
+  }
+}
+function tourRoleOf(matchId, pid){
+  const m = TOURNAMENT.matches[matchId];
+  if(!m) return null;
+  if(m.p1Id === pid) return 'p1';
+  if(m.p2Id === pid) return 'p2';
+  return null;
+}
+
+function tourHostHandleDisconnect(pid){
+  if(!TOURNAMENT) return;
+  if(!TOURNAMENT.started){
+    TOURNAMENT.participants = TOURNAMENT.participants.filter(p=>p.id!==pid);
+    delete tourConns[pid];
+    renderTourLobby();
+    tourBroadcast({ type:'tour-lobby-update', participants: TOURNAMENT.participants });
+    return;
+  }
+  const m = tourFindActiveMatchByParticipant(pid);
+  if(m && !m.finished){
+    const winnerId = (m.p1Id === pid) ? m.p2Id : m.p1Id;
+    tourFinishMatch(m, winnerId, true);
+  }
+}
+function tourFindActiveMatchByParticipant(pid){
+  return Object.values(TOURNAMENT.matches).find(m=> !m.finished && (m.p1Id===pid || m.p2Id===pid));
+}
+
+// ---------- 主持人端：賽程配對（單敗淘汰，人數不是 2 的冪次時隨機輪空補位）----------
+// 每場比賽最多只會有一個輪空：byesNeeded 一定小於這一輪的總場數，用固定場次分配，
+// 不是整批隨機洗牌，避免極低機率把兩個輪空湊成同一場。
+function tourPairUp(participants){
+  const shuffled = shuffle(participants.slice());
+  const n = shuffled.length;
+  if(n <= 1) return shuffled.length ? [{ p1: shuffled[0], p2:null, bye:true }] : [];
+  const size = Math.pow(2, Math.ceil(Math.log2(n)));
+  const totalMatches = size / 2;
+  const byesNeeded = size - n;
+  const byeIdx = new Set();
+  while(byeIdx.size < byesNeeded){ byeIdx.add(Math.floor(Math.random()*totalMatches)); }
+  const matches = [];
+  let ptr = 0;
+  for(let m=0; m<totalMatches; m++){
+    if(byeIdx.has(m)){
+      matches.push({ p1: shuffled[ptr++], p2: null, bye:true });
+    } else {
+      matches.push({ p1: shuffled[ptr++], p2: shuffled[ptr++], bye:false });
+    }
+  }
+  return shuffle(matches);
+}
+
+function tourBuildRound(participants){
+  const roundIdx = TOURNAMENT.rounds.length;
+  const pairs = tourPairUp(participants);
+  const roundMatches = pairs.map((pair, i)=> ({
+    matchId: roundIdx + '-' + i, p1: pair.p1, p2: pair.p2, bye: pair.bye, winner:null, done:false
+  }));
+  TOURNAMENT.rounds.push(roundMatches);
+
+  roundMatches.forEach(rm=>{
+    if(rm.bye){
+      rm.winner = rm.p1.id;
+      rm.done = true;
+      if(rm.p1.id !== 'host') tourSendTo(rm.p1.id, { type:'tour-bye-advance', matchId: rm.matchId });
+    } else {
+      tourStartMatch(rm);
+    }
+  });
+  tourBroadcastBracket();
+  tourCheckRoundComplete();
+}
+
+function tourStartMatch(rm){
+  const deck = buildDeck(tourLevelCounts);
+  const hp0 = computeStartHP(deck);
+  const m = {
+    matchId: rm.matchId, p1Id: rm.p1.id, p2Id: rm.p2.id, p1Name: rm.p1.name, p2Name: rm.p2.name,
+    deck, maxHp: hp0, idx:0, hp:{p1:hp0,p2:hp0}, score:{p1:0,p2:0}, dmg:{p1:0,p2:0}, round:null, finished:false
+  };
+  TOURNAMENT.matches[rm.matchId] = m;
+
+  let hostInMatch = false;
+  [
+    { id: rm.p1.id, role:'p1', myName: rm.p1.name, oppName: rm.p2.name, oppId: rm.p2.id },
+    { id: rm.p2.id, role:'p2', myName: rm.p2.name, oppName: rm.p1.name, oppId: rm.p1.id }
+  ].forEach(side=>{
+    if(side.id === 'host'){
+      hostInMatch = true;
+      tourMyMatchId = rm.matchId; tourMyRole = side.role;
+    } else {
+      tourSendTo(side.id, { type:'tour-match-assign', matchId: rm.matchId, myRole: side.role,
+        myName: side.myName, oppName: side.oppName, oppId: side.oppId,
+        deck: m.deck, maxHp: m.maxHp, totalRounds: m.deck.length });
+    }
+  });
+
+  if(hostInMatch){
+    tourEnterBattleScreen();
+  } else {
+    setTimeout(()=> tourHostStartRound(rm.matchId), TOUR_COUNTDOWN_MS);
+  }
+}
+
+// ---------- 主持人端：單場比賽的權威判定（跟 1v1 連線對戰同一套邏輯，改成多場並行）----------
+function tourHostTryAnswer(matchId, role, text){
+  const m = TOURNAMENT.matches[matchId];
+  if(!m || m.finished || !m.round || m.round.resolved || m.round.expired || !role) return;
+  clearTimeout(tourRoundTimeouts[matchId]);
+  const item = m.deck[m.idx];
+  tourHostResolveRound(matchId, role, text === item.m, text);
+}
+
+function tourHostResolveRound(matchId, resolvedBy, isCorrect, chosen){
+  const m = TOURNAMENT.matches[matchId];
+  const item = m.deck[m.idx];
+  const other = resolvedBy === 'p1' ? 'p2' : 'p1';
+  if(isCorrect){
+    const dmg = dmgForLevel(item.l);
+    m.hp[other] = Math.max(0, m.hp[other] - dmg);
+    m.score[resolvedBy]++;
+    m.dmg[resolvedBy] += dmg;
+  } else {
+    m.hp[resolvedBy] = Math.max(0, m.hp[resolvedBy] - BACKLASH_DMG);
+  }
+  m.round.resolved = true; m.round.resolvedBy = resolvedBy; m.round.chosen = chosen; m.round.correctness = isCorrect;
+  tourMatchBroadcast(m, { type:'tour-answer-result', matchId, resolvedBy, chosen, correct:isCorrect, hp:m.hp, score:m.score });
+  if(matchId === tourMyMatchId) tourRenderFromState();
+  setTimeout(()=> tourHostAdvanceMatch(matchId), RESOLVE_DELAY);
+}
+
+function tourHostStartRound(matchId){
+  const m = TOURNAMENT.matches[matchId];
+  if(!m || m.finished) return;
+  if(m.hp.p1 <= 0 || m.hp.p2 <= 0 || m.idx >= m.deck.length) return tourHostEndMatch(matchId);
+  clearTimeout(tourRoundTimeouts[matchId]);
+  m.round = { roundStartTs: Date.now(), resolved:false, resolvedBy:null, chosen:null, correctness:null, expired:false };
+  tourMatchBroadcast(m, { type:'tour-round-start', matchId, idx:m.idx, ts:m.round.roundStartTs });
+  if(matchId === tourMyMatchId){ tourLastRenderedIdx = -1; tourRenderFromState(); }
+  tourRoundTimeouts[matchId] = setTimeout(()=>{
+    if(m.round.resolved) return;
+    m.round.expired = true;
+    tourMatchBroadcast(m, { type:'tour-round-timeout', matchId });
+    if(matchId === tourMyMatchId) tourRenderFromState();
+    setTimeout(()=> tourHostAdvanceMatch(matchId), RESOLVE_DELAY);
+  }, TOUR_DECIDE_WINDOW);
+}
+
+function tourHostAdvanceMatch(matchId){
+  const m = TOURNAMENT.matches[matchId];
+  if(!m || m.finished) return;
+  m.idx++;
+  if(m.hp.p1 <= 0 || m.hp.p2 <= 0){
+    tourHostEndMatch(matchId);
+  } else if(m.idx >= m.deck.length){
+    tourHostEnterOvertime(matchId);
+  } else {
+    tourHostStartRound(matchId);
+  }
+}
+
+function tourHostEnterOvertime(matchId){
+  const m = TOURNAMENT.matches[matchId];
+  clearTimeout(tourRoundTimeouts[matchId]);
+  const extra = buildDeck(tourLevelCounts);
+  m.deck = m.deck.concat(extra);
+  tourMatchBroadcast(m, { type:'tour-overtime', matchId, extraDeck: extra });
+  if(matchId === tourMyMatchId){
+    showOvertimeBanner(()=> tourHostStartRound(matchId));
+  } else {
+    tourHostStartRound(matchId); // 不是主持人自己在打的那一場，不用播動畫，直接繼續出題
+  }
+}
+
+function tourHostEndMatch(matchId){
+  const m = TOURNAMENT.matches[matchId];
+  const winner = determineWinner(m.hp, m.score); // 理論上不會平手（每回合只有一邊會扣血），保留 draw 分支保險
+  const winnerRole = winner === 'draw' ? (m.dmg.p1 >= m.dmg.p2 ? 'p1' : 'p2') : winner;
+  const winnerId = winnerRole === 'p1' ? m.p1Id : m.p2Id;
+  tourFinishMatch(m, winnerId, false);
+}
+
+function tourFinishMatch(m, winnerId, forfeit){
+  if(m.finished) return;
+  m.finished = true;
+  m.winnerId = winnerId;
+  clearTimeout(tourRoundTimeouts[m.matchId]);
+  delete tourRoundTimeouts[m.matchId];
+  const winnerName = winnerId === m.p1Id ? m.p1Name : m.p2Name;
+  tourMatchBroadcast(m, { type:'tour-match-over', matchId:m.matchId, winnerId, winnerName, hp:m.hp, score:m.score, forfeit:!!forfeit });
+
+  const round = TOURNAMENT.rounds[TOURNAMENT.rounds.length-1];
+  const rm = round.find(r=>r.matchId === m.matchId);
+  if(rm){ rm.winner = winnerId; rm.done = true; }
+
+  if(m.matchId === tourMyMatchId){
+    tourHandleMyMatchOver(m.matchId, winnerId, m.p1Name, m.p2Name);
+  }
+
+  tourBroadcastBracket();
+  tourCheckRoundComplete();
+}
+
+// 自己這一場結束了（不管是主持人還是參賽者），播放勝負動畫後導向賽程觀戰畫面。
+// 注意：showWinnerReveal 的收尾是 2.8 秒後才觸發，如果主持人連續兩輪都要上場，
+// 這段等待期間很可能已經被分配到下一場新比賽（tourMyMatchId 已經改成新的 matchId）——
+// 這裡一定要認出「這個收尾對應的是哪一場」，如果比對到已經不是同一場了，就整段跳過，
+// 不能讓舊比賽的收尾動作把新比賽剛設定好的狀態洗掉，否則賽事會直接卡死打不完。
+function tourHandleMyMatchOver(matchId, winnerId, p1Name, p2Name){
+  if(tourTickHandle) clearInterval(tourTickHandle);
+  const winnerSlot = winnerId === tourMyId ? tourMyRole : (tourMyRole === 'p1' ? 'p2' : 'p1');
+  const iWon = winnerId === tourMyId;
+  showWinnerReveal(winnerSlot, p1Name, p2Name, ()=>{
+    if(tourMyMatchId !== matchId) return; // 已經被分配到下一場新比賽了，不要打斷新比賽
+    tourMyMatchId = null; tourMyRole = null;
+    renderTourBracketScreen(iWon ? '🎉 你贏了這一場！等待其他比賽結束，晉級下一輪…' : '💥 很可惜，你被淘汰了。可以留下來看看誰能奪冠！');
+    showScreen('screen-tournament-bracket');
+  });
+}
+
+function tourCheckRoundComplete(){
+  if(!TOURNAMENT) return;
+  const round = TOURNAMENT.rounds[TOURNAMENT.rounds.length-1];
+  if(!round.every(rm=>rm.done)) return;
+
+  if(round.length === 2 && !TOURNAMENT.semiLosers){
+    TOURNAMENT.semiLosers = round.map(rm=>{
+      if(rm.bye) return null;
+      const loserId = rm.winner === rm.p1.id ? rm.p2.id : rm.p1.id;
+      const m = TOURNAMENT.matches[rm.matchId];
+      const loserRole = loserId === m.p1Id ? 'p1' : 'p2';
+      return { id: loserId, name: tourNameOf(loserId), score: m.score[loserRole], dmg: m.dmg[loserRole] };
+    }).filter(Boolean);
+  }
+
+  if(round.length === 1){
+    const rm = round[0];
+    const winnerId = rm.winner;
+    const loserId = rm.bye ? null : (winnerId === rm.p1.id ? rm.p2.id : rm.p1.id);
+    TOURNAMENT.champion = { id: winnerId, name: tourNameOf(winnerId) };
+    TOURNAMENT.runnerUp = loserId ? { id: loserId, name: tourNameOf(loserId) } : null;
+    if(TOURNAMENT.semiLosers && TOURNAMENT.semiLosers.length){
+      let third;
+      if(TOURNAMENT.semiLosers.length === 1){
+        third = TOURNAMENT.semiLosers[0];
+      } else {
+        const a = TOURNAMENT.semiLosers[0], b = TOURNAMENT.semiLosers[1];
+        if(a.score !== b.score) third = a.score > b.score ? a : b;
+        else if(a.dmg !== b.dmg) third = a.dmg > b.dmg ? a : b;
+        else third = a;
+      }
+      TOURNAMENT.thirdPlace = { id: third.id, name: third.name };
+    }
+    tourFinishTournament();
+    return;
+  }
+
+  const winners = round.map(rm=> ({ id: rm.winner, name: tourNameOf(rm.winner) }));
+  tourBuildRound(winners);
+}
+
+function tourFinishTournament(){
+  Object.values(tourRoundTimeouts).forEach(h=> clearTimeout(h));
+  tourRoundTimeouts = {};
+  const payload = { type:'tour-final', champion: TOURNAMENT.champion, runnerUp: TOURNAMENT.runnerUp, thirdPlace: TOURNAMENT.thirdPlace };
+  tourBroadcast(payload);
+  tourRenderFinal(payload);
+}
+
+function tourRenderFinal(payload){
+  if(tourTickHandle) clearInterval(tourTickHandle);
+  document.getElementById('tour-end-champion').textContent = payload.champion ? payload.champion.name : '-';
+  document.getElementById('tour-end-runner').textContent = payload.runnerUp ? payload.runnerUp.name : '（僅雙人賽事，無亞軍比較對象）';
+  const thirdRow = document.getElementById('tour-end-third-row');
+  if(payload.thirdPlace){
+    thirdRow.classList.remove('hidden');
+    document.getElementById('tour-end-third').textContent = payload.thirdPlace.name;
+  } else {
+    thirdRow.classList.add('hidden');
+  }
+  showScreen('screen-tournament-end');
+}
+
+// ---------- 賽程表（觀戰視圖，主持人與參賽者共用同一份快照渲染）----------
+function tourBracketSnapshot(){
+  return {
+    type:'tour-bracket-update',
+    rounds: TOURNAMENT.rounds.map(round=> round.map(rm=>({
+      matchId: rm.matchId,
+      p1Name: rm.p1 ? rm.p1.name : '?',
+      p2Name: rm.p2 ? rm.p2.name : '（輪空）',
+      bye: !!rm.bye,
+      done: rm.done,
+      winnerName: rm.done ? tourNameOf(rm.winner) : null
+    })))
+  };
+}
+function tourBroadcastBracket(){
+  const snap = tourBracketSnapshot();
+  tourGuestBracketSnapshot = snap;
+  tourBroadcast(snap);
+  const sc = document.getElementById('screen-tournament-bracket');
+  if(sc && !sc.classList.contains('hidden')) renderTourBracketList(snap);
+}
+function renderTourBracketScreen(statusText){
+  document.getElementById('tour-bracket-status').textContent = statusText;
+  renderTourBracketList(tourGuestBracketSnapshot);
+}
+function renderTourBracketList(snap){
+  const box = document.getElementById('tour-bracket-list');
+  box.innerHTML = '';
+  if(!snap) return;
+  snap.rounds.forEach((round, ri)=>{
+    const roundBox = document.createElement('div');
+    roundBox.className = 'tour-round-block';
+    const label = round.length === 1 ? '🏆 決賽' : (round.length === 2 ? '🥉 準決賽' : `第 ${ri+1} 輪`);
+    const titleEl = document.createElement('div');
+    titleEl.className = 'tour-round-title';
+    titleEl.textContent = label;
+    roundBox.appendChild(titleEl);
+    round.forEach(rm=>{
+      const row = document.createElement('div');
+      row.className = 'tour-match-row' + (rm.done ? ' done' : '');
+      const vs = rm.bye ? (rm.p1Name + '（輪空晉級）') : (rm.p1Name + ' vs ' + rm.p2Name);
+      const result = (rm.done && !rm.bye) ? ('　🏅 ' + rm.winnerName + ' 晉級') : '';
+      row.textContent = vs + result;
+      roundBox.appendChild(row);
+    });
+    box.appendChild(roundBox);
+  });
+}
+
+// ---------- 共用：對戰畫面渲染（跟 1v1 連線對戰同一套 UI，重用 screen-battle）----------
+function tourGetMyMatch(){
+  if(!tourMyMatchId) return null;
+  if(TOUR_ROLE === 'host') return TOURNAMENT ? TOURNAMENT.matches[tourMyMatchId] : null;
+  return tourGuestMatch;
+}
+
+function tourEnterBattleScreen(){
+  const m = tourGetMyMatch();
+  if(!m) return;
+  document.getElementById('p1-hp-num').textContent = m.maxHp;
+  document.getElementById('p2-hp-num').textContent = m.maxHp;
+  showCountdown(()=>{
+    showScreen('screen-battle');
+    tourLastRenderedIdx = -1;
+    tourRenderFromState();
+    if(tourTickHandle) clearInterval(tourTickHandle);
+    tourTickHandle = setInterval(tourTick, 150);
+    if(TOUR_ROLE === 'host') tourHostStartRound(tourMyMatchId);
+  });
+}
+
+function tourRenderFromState(){
+  const m = tourGetMyMatch();
+  if(!m || !m.deck) return;
+  const maxHp = m.maxHp || 100;
+  document.getElementById('p1-name').textContent = m.p1Name;
+  document.getElementById('p2-name').textContent = m.p2Name;
+  document.getElementById('p1-hp').style.width = Math.max(0, m.hp.p1/maxHp*100) + '%';
+  document.getElementById('p2-hp').style.width = Math.max(0, m.hp.p2/maxHp*100) + '%';
+  animateHpNumber('p1-hp-num', Math.max(0, m.hp.p1));
+  animateHpNumber('p2-hp-num', Math.max(0, m.hp.p2));
+  document.getElementById('p1-score').textContent = m.score.p1;
+  document.getElementById('p2-score').textContent = m.score.p2;
+
+  if(m.idx >= m.deck.length || !m.round) return;
+  const item = m.deck[m.idx];
+  const tag = document.getElementById('word-level-tag');
+  tag.textContent = 'Lv.' + item.l + ' ' + LEVEL_META[item.l].name;
+  tag.style.background = LEVEL_META[item.l].color;
+  document.getElementById('word-display').textContent = item.w;
+
+  const r = m.round;
+
+  if(m.idx !== tourLastRenderedIdx){
+    tourLastRenderedIdx = m.idx;
+    const opt = document.getElementById('options-container');
+    opt.innerHTML = '';
+    item.options.forEach(text=>{
+      const b = document.createElement('button');
+      b.className = 'option-btn';
+      b.textContent = text;
+      b.disabled = false;
+      const submit = ()=>{
+        if(TOUR_ROLE === 'host') tourHostTryAnswer(m.matchId, tourMyRole, text);
+        else tourGuestSendAnswer(text);
+      };
+      b.onpointerdown = submit;
+      b.onclick = submit;
+      opt.appendChild(b);
+    });
+  }
+
+  const st = document.getElementById('buzz-status');
+  if(r.resolved){
+    document.querySelectorAll('#options-container .option-btn').forEach(b=>{
+      b.disabled = true;
+      if(b.textContent === item.m) b.classList.add('correct');
+      else if(b.textContent === r.chosen) b.classList.add('wrong');
+    });
+    const label = r.resolvedBy === 'p1' ? m.p1Name : m.p2Name;
+    if(r.correctness){
+      st.textContent = '⚡ ' + label + ' 最快點到正確答案！造成傷害 🔥';
+      st.className = 'buzz-status ' + r.resolvedBy;
+    } else {
+      st.textContent = '💢 ' + label + ' 點錯了，反噬傷害！';
+      st.className = 'buzz-status warn';
+    }
+  } else if(r.expired){
+    st.textContent = '⌛ 誰都沒點到，跳過這題';
+    st.className = 'buzz-status warn';
+    document.querySelectorAll('#options-container .option-btn').forEach(b=> b.disabled = true);
+  } else {
+    st.textContent = '看誰先點到正確答案！';
+    st.className = 'buzz-status';
+  }
+}
+
+// 純畫面用的讀秒動畫；實際逾時判定一律由主持人的 setTimeout 負責
+function tourTick(){
+  const m = tourGetMyMatch();
+  if(!m || !m.round) return;
+  const r = m.round;
+  const fill = document.getElementById('round-timer-fill');
+  if(r.resolved || r.expired){ fill.style.width = '0%'; return; }
+  const elapsed = Date.now() - r.roundStartTs;
+  const pct = Math.max(0, 100 - (elapsed/TOUR_DECIDE_WINDOW)*100);
+  fill.style.width = pct + '%';
+}
+
+// 註冊 Service Worker，只在「真正獨立開啟的網頁」才啟用離線快取。
+// 在 Claude 預覽（跑在 iframe 裡）就不要註冊——之前這裡沒判斷 iframe，導致在 Claude 預覽時
+// 也偷偷註冊了 Service Worker、把某一版頁面快取住，之後不管怎麼更新檔案，瀏覽器都優先讀取
+// 快取的舊版本，看起來就像改的東西完全沒生效（例如搶答鍵一直沒消失）。
+// 這裡順便做一次自我修復：如果偵測到目前是在 iframe 裡，就把之前可能殘留的 Service Worker
+// 全部註銷掉，讓頁面之後都讀取最新版本。
+if('serviceWorker' in navigator){
+  const isTopLevel = (window.top === window.self);
+  if(!isTopLevel){
+    navigator.serviceWorker.getRegistrations().then(regs=>{
+      regs.forEach(r=> r.unregister());
+    }).catch(()=>{});
+  } else if(location.protocol === 'https:' || location.hostname === 'localhost'){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('service-worker.js').then(reg=>{
+        // 偵測到有新版本時，等它完全啟用後自動重新整理一次，
+        // 避免使用者要手動重整兩次才會真的換到新版本（用 sessionStorage 擋掉無限重整）。
+        // 但如果玩家正在對戰/練習/挑戰模式中途，直接重整會把當下的畫面整個重置、
+        // 看起來像「莫名其妙跳回首頁」，所以改成：只有人在主選單或還沒取名字時才會立刻重整，
+        // 如果正在玩，就先記著、等偵測到回到主選單再重整，不會打斷正在進行的內容。
+        reg.addEventListener('updatefound', ()=>{
+          const nw = reg.installing;
+          if(!nw) return;
+          nw.addEventListener('statechange', ()=>{
+            if(nw.state === 'activated' && navigator.serviceWorker.controller){
+              if(!sessionStorage.getItem('word-duel-auto-reloaded')){
+                sessionStorage.setItem('word-duel-auto-reloaded', '1');
+                scheduleSafeReload();
+              }
+            }
+          });
+        });
+      }).catch(()=>{});
+    });
+  }
+}
+
+function scheduleSafeReload(){
+  const safeScreenIds = ['screen-menu', 'screen-name-setup'];
+  function isOnSafeScreen(){
+    return safeScreenIds.some(id=>{
+      const el = document.getElementById(id);
+      return el && !el.classList.contains('hidden');
+    });
+  }
+  if(isOnSafeScreen()){ location.reload(); return; }
+  const checkInterval = setInterval(()=>{
+    if(isOnSafeScreen()){
+      clearInterval(checkInterval);
+      location.reload();
+    }
+  }, 1200);
+}
+</script>
+</body>
+</html>
