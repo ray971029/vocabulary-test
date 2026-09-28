@@ -130,6 +130,33 @@
   .podium-row{ display:flex; align-items:center; gap:12px; padding:14px; border-radius:12px; background:var(--panel-2); border:1px solid var(--line); margin-bottom:10px; }
   .podium-medal{ font-size:1.8rem; }
   .podium-name{ font-weight:800; font-size:1.05rem; }
+
+  /* 橫向賽程圖：由左到右一輪一欄，最右邊是冠軍 */
+  .br-scroll{ overflow-x:auto; padding:4px 2px 10px; -webkit-overflow-scrolling:touch; }
+  .br-wrap{ --br-gap:28px; display:flex; min-width:max-content; }
+  .br-col{ display:flex; flex-direction:column; width:118px; margin-right:var(--br-gap); flex-shrink:0; }
+  .br-col:last-child{ margin-right:0; }
+  .br-title{ height:26px; line-height:26px; text-align:center; font-size:.76rem; font-weight:800; color:var(--gold); }
+  .br-cells{ flex:1; display:flex; flex-direction:column; }
+  .br-cell{ flex:1; min-height:74px; display:flex; align-items:center; position:relative; }
+  .br-cell.stub-r::after{ content:''; position:absolute; left:100%; top:50%; width:calc(var(--br-gap)/2); border-top:2px solid var(--sub); opacity:.55; }
+  .br-cell.stub-l::before{ content:''; position:absolute; right:100%; top:50%; width:calc(var(--br-gap)/2); border-top:2px solid var(--sub); opacity:.55; }
+  .br-join{ position:absolute; left:calc(100% + var(--br-gap)/2 - 1px); border-left:2px solid var(--sub); opacity:.55; }
+  .br-join.d{ top:50%; height:50%; }
+  .br-join.u{ top:0; height:50%; }
+  .br-match{ position:relative; width:100%; border-radius:10px; background:var(--panel-2); border:1px solid var(--line); overflow:hidden; font-size:.8rem; }
+  .br-match.live{ border-color:var(--gold); box-shadow:0 0 0 1px var(--gold); }
+  .br-live{ position:absolute; top:2px; right:4px; font-size:.7rem; }
+  .br-slot{ display:flex; justify-content:space-between; align-items:center; gap:6px; padding:6px 8px; min-height:30px; }
+  .br-slot + .br-slot{ border-top:1px solid var(--line); }
+  .br-slot.win{ background:rgba(52,211,153,.16); font-weight:800; }
+  .br-slot.lose{ color:var(--sub); opacity:.7; }
+  .br-slot.lose .br-name{ text-decoration:line-through; }
+  .br-slot.tbd, .br-slot.bye{ color:var(--sub); font-style:italic; }
+  .br-slot.me .br-name{ color:var(--gold); }
+  .br-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .br-champ{ width:100%; text-align:center; padding:12px 6px; border-radius:10px; border:1px solid var(--gold); background:var(--panel-2); font-weight:800; font-size:.85rem; }
+  .br-champ.me{ color:var(--gold); }
   .btn.ghost{ background:transparent; }
   .btn.small{ padding:10px 12px; font-size:.88rem; border-radius:10px; }
   .row-gap{ display:flex; flex-direction:column; gap:12px; }
@@ -404,6 +431,7 @@
   <div id="screen-tournament-bracket" class="hidden">
     <h1 class="brand">🏆 團體戰賽程</h1>
     <div class="tour-status-box" id="tour-bracket-status">等待比賽開始…</div>
+    <div class="hint" style="margin-bottom:8px;">✅ 晉級　❌ 淘汰　⚔️ 進行中　（可左右滑動查看完整賽程）</div>
     <div id="tour-bracket-list"></div>
     <button class="btn ghost" style="border:1px solid var(--line); margin-top:10px;" id="btn-tour-bracket-leave">離開賽事</button>
   </div>
@@ -415,6 +443,7 @@
       <div class="podium-row"><span class="podium-medal">🥇</span><span class="podium-name" id="tour-end-champion">-</span></div>
       <div class="podium-row"><span class="podium-medal">🥈</span><span class="podium-name" id="tour-end-runner">-</span></div>
       <div class="podium-row" id="tour-end-third-row"><span class="podium-medal">🥉</span><span class="podium-name" id="tour-end-third">-</span></div>
+      <div id="tour-end-bracket" style="margin-top:14px;"></div>
       <button class="btn ghost" style="border:1px solid var(--line); margin-top:10px;" id="btn-tour-end-back-menu">回到主選單</button>
     </div>
   </div>
@@ -568,7 +597,7 @@
     </div>
   </div>
 
-  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-27-01（如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
+  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-28-01（如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
 </div>
 
 <!-- PeerJS：連線對戰用的 WebRTC 點對點直連函式庫 -->
@@ -1971,6 +2000,8 @@ let tourRoundTimeouts = {};  // 主持人限定：{matchId: timeoutHandle}
 let tourLastRenderedIdx = -1;
 let tourTickHandle = null;
 const TOUR_DECIDE_WINDOW = 9000;
+const TOUR_PREVIEW_MS = 6000; // 每輪開打前，先讓所有人看賽程圖的時間
+const TOUR_REVEAL_MS = 3200;  // 一輪打完後，留給勝負揭曉動畫與賽程更新的時間，再開下一輪／頒獎
 const TOUR_COUNTDOWN_MS = 3100; // 跟 showCountdown() 的總長度一致，讓沒有參與該場比賽的主持人也用同樣的延遲才開始計時，公平起見
 
 function tourPeerIdFor(code){ return 'wordduel-tour-' + code; }
@@ -2164,7 +2195,7 @@ function tourGuestHandleMessage(msg){
         deck: msg.deck, maxHp: msg.maxHp, idx:0,
         hp:{p1:msg.maxHp, p2:msg.maxHp}, score:{p1:0,p2:0}, round:null
       };
-      tourEnterBattleScreen();
+      tourShowPreviewThenBattle(msg.matchId, msg.oppName);
       break;
     case 'tour-bye-advance':
       renderTourBracketScreen('🎉 這輪輪空，直接晉級下一輪！等待其他比賽結束…');
@@ -2288,17 +2319,36 @@ function tourPairUp(participants){
 
 function tourBuildRound(participants){
   const roundIdx = TOURNAMENT.rounds.length;
-  const pairs = tourPairUp(participants);
+  if(roundIdx === 0){
+    TOURNAMENT.size = Math.pow(2, Math.ceil(Math.log2(participants.length)));
+    TOURNAMENT.totalRounds = Math.round(Math.log2(TOURNAMENT.size));
+  }
+  // 第一輪隨機抽籤（含輪空）；之後每一輪固定「上一輪第 2i 場的贏家 vs 第 2i+1 場的贏家」，
+  // 這樣賽程才是一棵固定的樹，可以事先畫出完整賽程圖
+  let pairs;
+  if(roundIdx === 0){
+    pairs = tourPairUp(participants);
+  } else {
+    pairs = [];
+    for(let i=0; i<participants.length; i+=2){
+      pairs.push({ p1: participants[i], p2: participants[i+1], bye:false });
+    }
+  }
   const roundMatches = pairs.map((pair, i)=> ({
     matchId: roundIdx + '-' + i, p1: pair.p1, p2: pair.p2, bye: pair.bye, winner:null, done:false
   }));
   TOURNAMENT.rounds.push(roundMatches);
+  tourBroadcastBracket(); // 先送賽程圖，確保大家在被分配比賽前就有完整賽程可看
 
   roundMatches.forEach(rm=>{
     if(rm.bye){
       rm.winner = rm.p1.id;
       rm.done = true;
       if(rm.p1.id !== 'host') tourSendTo(rm.p1.id, { type:'tour-bye-advance', matchId: rm.matchId });
+      else {
+        renderTourBracketScreen('🎉 這輪輪空，直接晉級下一輪！等待其他比賽結束…');
+        showScreen('screen-tournament-bracket');
+      }
     } else {
       tourStartMatch(rm);
     }
@@ -2332,9 +2382,10 @@ function tourStartMatch(rm){
   });
 
   if(hostInMatch){
-    tourEnterBattleScreen();
+    tourShowPreviewThenBattle(rm.matchId, tourMyRole === 'p1' ? rm.p2.name : rm.p1.name);
   } else {
-    setTimeout(()=> tourHostStartRound(rm.matchId), TOUR_COUNTDOWN_MS);
+    // 主持人不在這場：跟參賽者一樣先等賽程圖預覽 + 進場倒數才開始計時，公平起見
+    setTimeout(()=> tourHostStartRound(rm.matchId), TOUR_PREVIEW_MS + TOUR_COUNTDOWN_MS);
   }
 }
 
@@ -2487,15 +2538,17 @@ function tourCheckRoundComplete(){
       }
       TOURNAMENT.thirdPlace = { id: third.id, name: third.name };
     }
-    tourFinishTournament();
+    tourBroadcastBracket(); // 賽程圖先更新出冠軍
+    setTimeout(tourFinishTournament, TOUR_REVEAL_MS); // 留時間給最後一場的勝負揭曉，再頒獎
     return;
   }
 
   const winners = round.map(rm=> ({ id: rm.winner, name: tourNameOf(rm.winner) }));
-  tourBuildRound(winners);
+  setTimeout(()=>{ if(TOURNAMENT) tourBuildRound(winners); }, TOUR_REVEAL_MS); // 留時間給勝負揭曉動畫，也讓大家看到賽程圖更新
 }
 
 function tourFinishTournament(){
+  if(!TOURNAMENT) return;
   Object.values(tourRoundTimeouts).forEach(h=> clearTimeout(h));
   tourRoundTimeouts = {};
   const payload = { type:'tour-final', champion: TOURNAMENT.champion, runnerUp: TOURNAMENT.runnerUp, thirdPlace: TOURNAMENT.thirdPlace };
@@ -2505,6 +2558,7 @@ function tourFinishTournament(){
 
 function tourRenderFinal(payload){
   if(tourTickHandle) clearInterval(tourTickHandle);
+  tourMyMatchId = null; tourMyRole = null; // 避免最後一場的揭曉收尾把頒獎畫面蓋掉
   document.getElementById('tour-end-champion').textContent = payload.champion ? payload.champion.name : '-';
   document.getElementById('tour-end-runner').textContent = payload.runnerUp ? payload.runnerUp.name : '（僅雙人賽事，無亞軍比較對象）';
   const thirdRow = document.getElementById('tour-end-third-row');
@@ -2514,22 +2568,36 @@ function tourRenderFinal(payload){
   } else {
     thirdRow.classList.add('hidden');
   }
+  renderTourBracketList(tourGuestBracketSnapshot, document.getElementById('tour-end-bracket'));
   showScreen('screen-tournament-end');
 }
 
 // ---------- 賽程表（觀戰視圖，主持人與參賽者共用同一份快照渲染）----------
 function tourBracketSnapshot(){
-  return {
-    type:'tour-bracket-update',
-    rounds: TOURNAMENT.rounds.map(round=> round.map(rm=>({
-      matchId: rm.matchId,
-      p1Name: rm.p1 ? rm.p1.name : '?',
-      p2Name: rm.p2 ? rm.p2.name : '（輪空）',
-      bye: !!rm.bye,
-      done: rm.done,
-      winnerName: rm.done ? tourNameOf(rm.winner) : null
-    })))
-  };
+  const T = TOURNAMENT;
+  const slotOf = (p)=> p ? { id:p.id, name:p.name } : null;
+  const rounds = [];
+  for(let r=0; r<T.totalRounds; r++){
+    const count = T.size / Math.pow(2, r+1);
+    const actual = T.rounds[r];
+    const prev = r > 0 ? rounds[r-1] : null;
+    const win = (f)=> (f && f.done && f.winnerId) ? { id:f.winnerId, name: tourNameOf(f.winnerId) } : null;
+    const col = [];
+    for(let i=0; i<count; i++){
+      if(actual && actual[i]){
+        const rm = actual[i];
+        const m = T.matches[rm.matchId];
+        col.push({ p1: slotOf(rm.p1), p2: slotOf(rm.p2), bye: !!rm.bye, done: !!rm.done,
+          winnerId: rm.done ? rm.winner : null, live: !!(m && !m.finished) });
+      } else {
+        // 這一輪還沒開打：先用上一輪已經決出的贏家填進去，其餘顯示「待定」
+        col.push({ p1: prev ? win(prev[2*i]) : null, p2: prev ? win(prev[2*i+1]) : null,
+          bye:false, done:false, winnerId:null, live:false });
+      }
+    }
+    rounds.push(col);
+  }
+  return { type:'tour-bracket-update', rounds, champion: T.champion ? { id:T.champion.id, name:T.champion.name } : null };
 }
 function tourBroadcastBracket(){
   const snap = tourBracketSnapshot();
@@ -2542,28 +2610,68 @@ function renderTourBracketScreen(statusText){
   document.getElementById('tour-bracket-status').textContent = statusText;
   renderTourBracketList(tourGuestBracketSnapshot);
 }
-function renderTourBracketList(snap){
-  const box = document.getElementById('tour-bracket-list');
-  box.innerHTML = '';
-  if(!snap) return;
-  snap.rounds.forEach((round, ri)=>{
-    const roundBox = document.createElement('div');
-    roundBox.className = 'tour-round-block';
-    const label = round.length === 1 ? '🏆 決賽' : (round.length === 2 ? '🥉 準決賽' : `第 ${ri+1} 輪`);
-    const titleEl = document.createElement('div');
-    titleEl.className = 'tour-round-title';
-    titleEl.textContent = label;
-    roundBox.appendChild(titleEl);
-    round.forEach(rm=>{
-      const row = document.createElement('div');
-      row.className = 'tour-match-row' + (rm.done ? ' done' : '');
-      const vs = rm.bye ? (rm.p1Name + '（輪空晉級）') : (rm.p1Name + ' vs ' + rm.p2Name);
-      const result = (rm.done && !rm.bye) ? ('　🏅 ' + rm.winnerName + ' 晉級') : '';
-      row.textContent = vs + result;
-      roundBox.appendChild(row);
-    });
-    box.appendChild(roundBox);
+function tourMk(tag, cls, text){
+  const e = document.createElement(tag);
+  e.className = cls;
+  if(text !== undefined) e.textContent = text;
+  return e;
+}
+function tourMatchCard(m){
+  const card = tourMk('div', 'br-match' + (m.live ? ' live' : ''));
+  [m.p1, m.p2].forEach((p, idx)=>{
+    let cls = 'br-slot', name, ico = '';
+    if(!p){
+      if(m.bye && idx === 1){ cls += ' bye'; name = '輪空'; }
+      else { cls += ' tbd'; name = '待定'; }
+    } else {
+      name = p.name;
+      if(m.done){
+        if(p.id === m.winnerId){ cls += ' win'; ico = '✅'; }
+        else { cls += ' lose'; ico = '❌'; }
+      }
+      if(p.id === tourMyId) cls += ' me';
+    }
+    const row = tourMk('div', cls);
+    row.appendChild(tourMk('span', 'br-name', name));
+    if(ico) row.appendChild(tourMk('span', 'br-ico', ico));
+    card.appendChild(row);
   });
+  if(m.live) card.appendChild(tourMk('span', 'br-live', '⚔️'));
+  return card;
+}
+// 橫向賽程圖：由左到右一輪一欄，最右邊是冠軍；每場比賽用連線接到下一輪
+function renderTourBracketList(snap, box){
+  box = box || document.getElementById('tour-bracket-list');
+  box.innerHTML = '';
+  if(!snap || !snap.rounds || !snap.rounds.length) return;
+  const total = snap.rounds.length;
+  const scroll = tourMk('div', 'br-scroll');
+  const wrap = tourMk('div', 'br-wrap');
+  snap.rounds.forEach((round, r)=>{
+    const col = tourMk('div', 'br-col');
+    const n = round.length;
+    col.appendChild(tourMk('div', 'br-title', n === 1 ? '決賽' : (n === 2 ? '準決賽' : (n*2) + ' 強')));
+    const cells = tourMk('div', 'br-cells');
+    round.forEach((m, i)=>{
+      const cell = tourMk('div', 'br-cell stub-r' + (r > 0 ? ' stub-l' : ''));
+      if(r < total-1) cell.appendChild(tourMk('div', 'br-join ' + (i % 2 === 0 ? 'd' : 'u')));
+      cell.appendChild(tourMatchCard(m));
+      cells.appendChild(cell);
+    });
+    col.appendChild(cells);
+    wrap.appendChild(col);
+  });
+  const champCol = tourMk('div', 'br-col');
+  champCol.appendChild(tourMk('div', 'br-title', '🏆 冠軍'));
+  const champCells = tourMk('div', 'br-cells');
+  const champCell = tourMk('div', 'br-cell stub-l');
+  const c = snap.champion;
+  champCell.appendChild(tourMk('div', 'br-champ' + (c && c.id === tourMyId ? ' me' : ''), c ? ('🏆 ' + c.name) : '待定'));
+  champCells.appendChild(champCell);
+  champCol.appendChild(champCells);
+  wrap.appendChild(champCol);
+  scroll.appendChild(wrap);
+  box.appendChild(scroll);
 }
 
 // ---------- 共用：對戰畫面渲染（跟 1v1 連線對戰同一套 UI，重用 screen-battle）----------
@@ -2571,6 +2679,20 @@ function tourGetMyMatch(){
   if(!tourMyMatchId) return null;
   if(TOUR_ROLE === 'host') return TOURNAMENT ? TOURNAMENT.matches[tourMyMatchId] : null;
   return tourGuestMatch;
+}
+
+// 被分配到比賽後，先顯示完整賽程圖讓大家看清楚對戰組合，倒數幾秒才進入對戰畫面
+function tourShowPreviewThenBattle(matchId, oppName){
+  showScreen('screen-tournament-bracket');
+  let left = Math.max(1, Math.round(TOUR_PREVIEW_MS / 1000));
+  const tick = ()=>{
+    if(tourMyMatchId !== matchId) return; // 期間被淘汰／賽事結束／離開，就不要再進對戰畫面
+    if(left <= 0){ tourEnterBattleScreen(); return; }
+    renderTourBracketScreen('⚔️ 你的對手：' + oppName + '　' + left + ' 秒後開戰！');
+    left--;
+    setTimeout(tick, 1000);
+  };
+  tick();
 }
 
 function tourEnterBattleScreen(){
